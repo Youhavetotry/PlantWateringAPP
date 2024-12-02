@@ -1,7 +1,12 @@
 import React from 'react';
 import { Stack } from 'expo-router';
+import { useTheme } from '../style/theme-context'; // 引入 useTheme
+
 
 export default function StackLayout() {
+
+  const { theme } = useTheme(); // 使用 useTheme 獲取當前主題
+
   return (
     <Stack
       screenOptions={({ route }) => {
@@ -18,10 +23,10 @@ export default function StackLayout() {
 
         return {
           headerStyle: {
-            backgroundColor: '#25292e',
+            backgroundColor: theme === "light" ? "#f9f9f9" : "#25292e",
           },
           headerShadowVisible: false,
-          headerTintColor: '#fff',
+          headerTintColor: theme === "light" ? "#000" : "#fff", // 根據主題設定 header 文字顏色
           title, // 使用動態標題
         };
       }}

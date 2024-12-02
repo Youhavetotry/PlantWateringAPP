@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router'; // 使用 expo-router 的 useRouter
+import { useTheme } from '../style/theme-context'; // 引入 useTheme
+import { getDynamicStyles } from "../style/dynamic-style";
 
 const plantData = [
   {
@@ -28,21 +30,23 @@ const plantData = [
 ];
 
 export default function PlantType() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => getDynamicStyles(theme), [theme]);
   const router = useRouter();  // 使用 useRouter
 
   const renderItem = ({ item }: { item: typeof plantData[0] }) => (
     <TouchableOpacity
-      style={styles.card}
+      style={sstyles.card}
       onPress={() => router.push(`../type/${item.page}?soilMoisture=${item.params.soilMoisture}&temperature=${item.params.temperature}&humidity=${item.params.humidity}`)}  // 使用 router.push
     >
-      <Image source={item.image} style={styles.image} />
+      <Image source={item.image} style={sstyles.image} />
       <Text style={styles.text}>{item.name}</Text>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.title, { color: '#fff' }]}>選擇植物種類</Text>
+      <Text style={styles.title}>選擇植物種類</Text>
       <FlatList
         data={plantData}
         renderItem={renderItem}
@@ -53,18 +57,7 @@ export default function PlantType() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#25292e',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
+const sstyles = StyleSheet.create({
   card: {
     flex: 1,
     margin: 10,
@@ -74,11 +67,5 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 10,
-  },
-  text: {
-    marginTop: 10,
-    fontSize: 16,
-    fontWeight: '100',
-    color: '#fff',
   },
 });

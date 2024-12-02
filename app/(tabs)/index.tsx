@@ -1,142 +1,101 @@
-import { View, StyleSheet, Platform } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { useState, useRef } from 'react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import * as MediaLibrary from 'expo-media-library';
-import { type ImageSource } from "expo-image";
-import { captureRef } from 'react-native-view-shot';
-import domtoimage from 'dom-to-image';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { useTheme } from '../style/theme-context';
+import { getDynamicStyles } from "../style/dynamic-style";
+import { useSensorData } from '../context/sensor-data-context';
 
-import Button from '@/components/Button';
-import ImageViewer from '@/components/ImageViewer';
-import IconButton from '@/components/IconButton';
-import CircleButton from '@/components/CircleButton';
-import EmojiPicker from '@/components/EmojiPicker';
-import EmojiList from '@/components/EmojiList';
-import EmojiSticker from '@/components/EmojiSticker';
+// 帶動畫的自定義進度條元件
+const AnimatedProgressBar = ({ progress, color }: { progress: number; color: string }) => {
+  const clampedProgress = Math.min(1, Math.max(0, progress)); // 確保範圍在 0-1 之間
+  const animatedWidth = useRef(new Animated.Value(0)).current;
 
-const PlaceholderImage = require('@/assets/images/background-image.png');
-
-export default function Index() {
-  const [selectedImage, setSelectedImage] = useState<string | undefined>(undefined);
-  const [showAppOptions, setShowAppOptions] = useState<boolean>(false);
-  const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
-  const [pickedEmoji, setPickedEmoji] = useState<ImageSource | undefined>(undefined);
-  const [status, requestPermission] = MediaLibrary.usePermissions();
-  const imageRef = useRef<View>(null);
-
-  if (status === null) {
-    requestPermission();
-  }
-
-  const pickImageAsync = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
-      setShowAppOptions(true);
-    } else {
-      alert('You did not select any image.');
-    }
-  };
-
-  const onReset = () => {
-    setShowAppOptions(false);
-  };
-
-  const onAddSticker = () => {
-    setIsModalVisible(true);
-  };
-
-  const onModalClose = () => {
-    setIsModalVisible(false);
-  };
-
-  const onSaveImageAsync = async () => {
-    if (Platform.OS !== 'web') {
-      try {
-        const localUri = await captureRef(imageRef, {
-          height: 440,
-          quality: 1,
-        });
-
-        await MediaLibrary.saveToLibraryAsync(localUri);
-        if (localUri) {
-          alert('Saved!');
-        }
-      } catch (e) {
-        console.log(e);
-      }
-    } else {
-      try {
-        const dataUrl = await domtoimage.toJpeg(imageRef.current, {
-          quality: 0.95,
-          width: 320,
-          height: 440,
-        });
-
-        let link = document.createElement('a');
-        link.download = 'sticker-smash.jpeg';
-        link.href = dataUrl;
-        link.click();
-      } catch (e) {
-        console.log(e);
-      }
-    }
-  };
+  useEffect(() => {
+    // 以動畫方式更新進度
+    Animated.timing(animatedWidth, {
+      toValue: clampedProgress * 100, // 將比例轉為百分比
+      duration: 500, // 動畫持續時間
+      useNativeDriver: false, // 使用非原生動畫處理寬度變化
+    }).start();
+  }, [clampedProgress]);
 
   return (
-    <GestureHandlerRootView style={styles.container}>
-      <View style={styles.imageContainer}>
-        <View ref={imageRef} collapsable={false}>
-          <ImageViewer imgSource={PlaceholderImage} selectedImage={selectedImage} />
-          {pickedEmoji && <EmojiSticker imageSize={40} stickerSource={pickedEmoji} />}
-        </View>
+    <View style={styles.progressBarContainer}>
+      <Animated.View
+        style={[
+          styles.progressBarFill,
+          {
+            width: animatedWidth.interpolate({
+              inputRange: [0, 100],
+              outputRange: ['0%', '100%'],
+            }),
+            backgroundColor: color,
+          },
+        ]}
+      />
+    </View>
+  );
+};
+
+export default function IndexScreen() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => getDynamicStyles(theme), [theme]);
+
+  // 從 SensorDataProvider 獲取感測器數據
+  const { sensorData } = useSensorData();
+
+  // 處理感測器數據
+  const soilMoisture = sensorData.soilMoisture;
+  const temperature = sensorData.temperature;
+  const humidity = sensorData.humidity;
+
+  // 計算進度條的比例值
+  const validSoilMoisture = Math.round((soilMoisture / 100) * 100) / 100;
+  const validTemperature = Math.round((temperature / 40) * 100) / 100;
+  const validHumidity = Math.round((humidity / 100) * 100) / 100;
+
+  return (
+    <View style={styles.container}>
+      {/* 澆水開關按鈕 */}
+      <View style={styles.WateringButtonContainer}>
+        <TouchableOpacity onPress={() => {}} style={[styles.button]}>
+          <Text style={{ color: theme === 'light' ? '#fff' : '#000' }}>澆水開關</Text>
+        </TouchableOpacity>
       </View>
-      {showAppOptions ? (
-        <View style={styles.optionsContainer}>
-          <View style={styles.optionsRow}>
-            <IconButton icon="refresh" label="Reset" onPress={onReset} />
-            <CircleButton onPress={onAddSticker} />
-            <IconButton icon="save-alt" label="Save" onPress={onSaveImageAsync} />
-          </View>
-        </View>
-      ) : (
-        <View style={styles.footerContainer}>
-          <Button theme="primary" label="Choose a photo" onPress={pickImageAsync} />
-          <Button label="Use this photo" onPress={() => setShowAppOptions(true)} />
-        </View>
-      )}
-      <EmojiPicker isVisible={isModalVisible} onClose={onModalClose}>
-        <EmojiList onSelect={setPickedEmoji} onCloseModal={onModalClose} />
-      </EmojiPicker>
-    </GestureHandlerRootView>
+
+      {/* 通知按鈕 */}
+      <View style={styles.notificationButtonContainer}>
+        <TouchableOpacity onPress={() => {}} style={[styles.button]}>
+          <Text style={{ color: theme === 'light' ? '#fff' : '#000' }}>通知</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 顯示土壤濕度、溫度、濕度進度條 */}
+      <View style={styles.sensorDataContainer}>
+        <Text style={styles.title}>土壤濕度: {soilMoisture}%</Text>
+        <AnimatedProgressBar progress={validSoilMoisture} color="#1abc9c" />
+
+        <Text style={styles.title}>溫度: {temperature}°C</Text>
+        <AnimatedProgressBar progress={validTemperature} color="#f39c12" />
+
+        <Text style={styles.title}>環境濕度: {humidity}%</Text>
+        <AnimatedProgressBar progress={validHumidity} color="#3498db" />
+      </View>
+    </View>
   );
 }
 
+// 樣式表
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#25292e',
-    alignItems: 'center',
+  progressBarContainer: {
+    height: 10,
+    width: '100%',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 5,
+    overflow: 'hidden', // 確保填充條不會超出範圍
+    marginVertical: 8,
   },
-  imageContainer: {
-    flex: 1,
-  },
-  footerContainer: {
-    flex: 1 / 3,
-    alignItems: 'center',
-  },
-  optionsContainer: {
-    position: 'absolute',
-    bottom: 80,
-  },
-  optionsRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 5,
   },
 });

@@ -1,7 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../style/theme-context'; // 引入 useTheme
+import { getDynamicStyles } from "../style/dynamic-style";
+
 
 export default function TigerTailPage() {
+
+  const { theme } = useTheme();
+  const styles = useMemo(() => getDynamicStyles(theme), [theme]);
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>虎尾蘭 (Sansevieria trifasciata)</Text>
@@ -14,37 +21,7 @@ export default function TigerTailPage() {
       <Text style={styles.text}>虎尾蘭最適宜的生長溫度範圍為16°C 到 30°C（61°F 到 86°F）。它對溫度的耐受性較強，可以忍受偶爾的低溫，但不適合長時間處於寒冷環境。溫度低於5°C（41°F）會影響其生長，甚至可能導致凍傷。</Text>
       
       <Text style={styles.paramTitle}>★ 環境濕度</Text>
-      <Text style={styles.text}>​,虎尾蘭適應各種濕度範圍，無需過高的空氣濕度。它能夠在普通的家庭環境中生長，理想的環境濕度範圍為30% 到 50%，過高或過低的濕度會影響植物的生長，導致葉片發黃或縮小</Text>
+      <Text style={styles.text}>​虎尾蘭適應各種濕度範圍，無需過高的空氣濕度。它能夠在普通的家庭環境中生長，理想的環境濕度範圍為30% 到 50%，過高或過低的濕度會影響植物的生長，導致葉片發黃或縮小</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#25292e',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 50,
-    color: '#fff',
-  },
-  subtitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 0,
-    color: '#fff',
-  },
-  paramTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 50,
-    color: '#fff',
-  },
-  text: {
-    color: '#fff',
-    fontSize: 14,
-  },
-});

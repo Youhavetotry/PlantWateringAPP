@@ -1,6 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo} from 'react';
 import { Text, View, StyleSheet, Button, ScrollView, Dimensions } from 'react-native';
 import Svg, { Line, Polyline } from 'react-native-svg';
+import { useTheme } from '../style/theme-context'; // 引入 useTheme
+import { getDynamicStyles } from "../style/dynamic-style";
+import { useSensorData } from '../context/sensor-data-context'; // 引入 useSensorData
 
 const { width } = Dimensions.get('window');
 
@@ -34,7 +37,11 @@ const generatePoints = (data: number[]) => {
     .join(' ');
 };
 
+
 export default function SensorData() {
+  
+  const { theme, toggleTheme } = useTheme();
+  const styles = useMemo(() => getDynamicStyles(theme), [theme]);
   const [sensorData, setSensorData] = useState<any>({
     soilMoisture: 50,
     temperature: 25,
@@ -116,7 +123,7 @@ export default function SensorData() {
                     width: (width-150) / historyData[key].length,
                     marginHorizontal: 5, // 增加間隔
                     textAlign: 'center',
-                    color: 'white',
+                    color: theme === 'light' ? '#000' : '#fff',
                     fontSize: 12,
                   }}
                 >
@@ -135,47 +142,3 @@ export default function SensorData() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#25292e',
-    paddingTop: 20,
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 20,
-  },
-  dataContainer: {
-    marginBottom: 20,
-  },
-  text: {
-    fontSize: 18,
-    color: '#fff',
-    marginBottom: 10,
-  },
-  chartTitle: {
-    fontSize: 18,
-    color: '#fff',
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  chartContainer: {
-    width: '100%',
-  },
-  chartWrapper: {
-    marginBottom: 40,
-  },
-  labelContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 0,
-  },
-  buttonContainer: {
-    marginTop: 20,
-    marginBottom: 20,
-    paddingHorizontal: 20,
-  },
-});

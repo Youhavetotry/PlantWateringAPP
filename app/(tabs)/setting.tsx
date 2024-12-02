@@ -1,21 +1,28 @@
-import { Text, View, StyleSheet } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTheme } from '../style/theme-context'; // 引入 useTheme
+import { getDynamicStyles } from "../style/dynamic-style";
 
-export default function settingScreen() {
+export default function SettingsPage() {
+  const { theme, toggleTheme } = useTheme();
+  const styles = useMemo(() => getDynamicStyles(theme), [theme]);
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>目前沒有任何設定...</Text>
+    <View
+      style={[
+        styles.container
+      ]}
+    >
+      <TouchableOpacity
+        onPress={toggleTheme}
+        style={[
+          styles.button
+        ]}
+      >
+        <Text style={{ color: theme === 'light' ? '#fff' : '#000' }}>
+          切換主題：{theme === 'light' ? '淺色模式' : '深色模式'}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#25292e',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  text: {
-    color: '#fff',
-  },
-});
