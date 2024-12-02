@@ -2,4 +2,4 @@
   
 https://github.com/fluffywinnie/PlantAutoWatering
   
-目前完成狀態: 約30%
+目前完成狀態: 約40%
