@@ -17,7 +17,7 @@ export default function TabLayout() {
     backgroundColor: theme === "light" ? "#f9f9f9" : "#25292e", // 根據主題設定 header 背景顏色
   };
 
-  const headerTintColor = theme === "light" ? "#000" : "#fff"; // 根據主題設定 header 文字顏色
+  const headerTintColor = theme === "light" ? "#25292e" : "#fff"; // 根據主題設定 header 文字顏色
 
   return (
     <SensorDataProvider>
@@ -33,7 +33,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "澆水開關",
+          title: "澆水設定",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "home-sharp" : "home-outline"}

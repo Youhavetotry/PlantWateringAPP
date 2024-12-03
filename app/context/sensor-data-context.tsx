@@ -76,3 +76,6 @@ export const useSensorData = (): SensorDataContextType => {
   }
   return context;
 };
+
+export default function SensorContextScreen() {
+}

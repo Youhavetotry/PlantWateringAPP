@@ -28,9 +28,9 @@ export const getDynamicStyles = (theme: 'light' | 'dark') => {
       },
       chartTitle: {
         fontSize: 18,
+        marginTop: 10,
+        marginBottom: 0,
         color: theme === 'light' ? '#25292e' : '#fff', // 文字顏色根據主題設置
-        marginTop: 20,
-        marginBottom: 10,
       },
       chartContainer: {
         width: '100%',
@@ -49,12 +49,12 @@ export const getDynamicStyles = (theme: 'light' | 'dark') => {
         paddingHorizontal: 20,
       },
       dataContainer: {
-        marginBottom: 20,
+        marginBottom:20,
       },
       subtitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        marginBottom: 0,
+        fontSize: 18,
+        marginTop: 20,
+        marginBottom: 40,
         color: theme === 'light' ? '#25292e' : '#fff', // 文字顏色根據主題設置
         textAlign: 'center',
       },

@@ -20,7 +20,7 @@ export default function SettingsPage() {
         ]}
       >
         <Text style={{ color: theme === 'light' ? '#fff' : '#000' }}>
-          切換主題：{theme === 'light' ? '淺色模式' : '深色模式'}
+          切換主題：{theme === 'light' ? '深色模式' : '淺色模式'}
         </Text>
       </TouchableOpacity>
     </View>

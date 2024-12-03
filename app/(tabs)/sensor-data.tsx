@@ -1,52 +1,39 @@
-import React, { useEffect, useState, useMemo} from 'react';
-import { Text, View, StyleSheet, Button, ScrollView, Dimensions } from 'react-native';
-import Svg, { Line, Polyline } from 'react-native-svg';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Text, View, ScrollView, Dimensions } from 'react-native';
+import Svg, { Polyline, Text as SvgText, Circle } from 'react-native-svg';
 import { useTheme } from '../style/theme-context'; // 引入 useTheme
-import { getDynamicStyles } from "../style/dynamic-style";
+import { getDynamicStyles } from '../style/dynamic-style';
 import { useSensorData } from '../context/sensor-data-context'; // 引入 useSensorData
 
 const { width } = Dimensions.get('window');
+const marginLeft = 25; // 左邊邊距
+const marginRight = 75; // 右邊邊距
 
-// 渲染折線圖的點，並保證x和y不會是NaN
-const generatePoints = (data: number[]) => {
-  if (data.length < 2) {
-    return ''; // 如果數據點少於兩個，則不顯示任何折線圖
-  }
+// 生成折線圖的點和對應數據標籤
+const generatePointsWithLabels = (data: number[]) => {
+  if (data.length < 2) return { points: '', labels: [] };
 
-  return data
-    .map((value, index) => {
-      // 如果數值無效，返回null
-      if (isNaN(value)) {
-        console.error('Invalid value at index:', index, value);
-        return null;
-      }
+  const points: string[] = [];
+  const labels: { x: number; y: number; value: number }[] = [];
 
-      // 生成有效的x, y坐標
-      const x = ((width -50)/ (data.length - 1)) * index; // x坐標等分
-      const y = 200 - (value / 100) * 150; // y坐標根據數據調整
+  data.forEach((value, index) => {
+    const x = ((width - marginLeft - marginRight) / (data.length - 1)) * index + marginLeft; // x 坐標加入邊距
+    const y = 200 - (value / 100) * 150; // y 坐標根據數據調整
+    points.push(`${x},${y}`);
+    labels.push({ x, y, value });
+  });
 
-      // 如果計算出來的x, y無效，返回null
-      if (isNaN(x) || isNaN(y)) {
-        console.error('Invalid x or y value:', { x, y });
-        return null;
-      }
-
-      return `${x},${y}`;
-    })
-    .filter((point) => point !== null) // 過濾掉無效的點
-    .join(' ');
+  return {
+    points: points.join(' '),
+    labels,
+  };
 };
 
-
 export default function SensorData() {
-  
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const styles = useMemo(() => getDynamicStyles(theme), [theme]);
-  const [sensorData, setSensorData] = useState<any>({
-    soilMoisture: 50,
-    temperature: 25,
-    humidity: 60,
-  });
+
+  const { sensorData } = useSensorData(); // 從 context 獲取數據
 
   const [historyData, setHistoryData] = useState({
     soilMoisture: [] as number[],
@@ -54,91 +41,80 @@ export default function SensorData() {
     humidity: [] as number[],
   });
 
-  const fetchSensorData = async () => {
-    try {
-      const randomSoilMoisture = Math.floor(Math.random() * 101); // 0 - 100
-      const randomTemperature = Math.floor(Math.random() * 31) + 10; // 10 - 40
-      const randomHumidity = Math.floor(Math.random() * 101); // 0 - 100
-
-      setSensorData({
-        soilMoisture: randomSoilMoisture,
-        temperature: randomTemperature,
-        humidity: randomHumidity,
-      });
-
-      setHistoryData((prevData) => ({
-        soilMoisture: [...prevData.soilMoisture.slice(-9), randomSoilMoisture],
-        temperature: [...prevData.temperature.slice(-9), randomTemperature],
-        humidity: [...prevData.humidity.slice(-9), randomHumidity],
-      }));
-    } catch (error) {
-      console.error('Error fetching sensor data:', error);
-    }
-  };
-
   useEffect(() => {
-    const interval = setInterval(fetchSensorData, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    setHistoryData((prev) => ({
+      soilMoisture: [...prev.soilMoisture.slice(-9), sensorData.soilMoisture],
+      temperature: [...prev.temperature.slice(-9), sensorData.temperature],
+      humidity: [...prev.humidity.slice(-9), sensorData.humidity],
+    }));
+  }, [sensorData]);
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>感測器檢測 (模擬數據)</Text>
-
       <View style={styles.dataContainer}>
         <Text style={styles.text}>土壤濕度: {sensorData.soilMoisture}%</Text>
         <Text style={styles.text}>室內溫度: {sensorData.temperature}°C</Text>
         <Text style={styles.text}>環境濕度: {sensorData.humidity}%</Text>
       </View>
 
-      <Text style={styles.chartTitle}>感測器歷史數據</Text>
+      <Text style={styles.subtitle}>感測器歷史數據</Text>
 
       <View style={styles.chartContainer}>
-        {(['soilMoisture', 'temperature', 'humidity'] as const).map((key) => (
-          <View key={key} style={styles.chartWrapper}>
-            <Text style={styles.chartTitle}>
-              {key === 'soilMoisture' ? '土壤濕度' : key === 'temperature' ? '室內溫度' : '環境濕度'}
-            </Text>
+        {(['soilMoisture', 'temperature', 'humidity'] as const).map((key) => {
+          const { points, labels } = generatePointsWithLabels(historyData[key]);
+          return (
+            <View key={key} style={styles.chartWrapper}>
+              <Text style={styles.chartTitle}>
+                {key === 'soilMoisture' ? '土壤濕度' : key === 'temperature' ? '室內溫度' : '環境濕度'}
+              </Text>
 
-            <Svg height="200" width={width - 50}>
-              <Polyline
-                points={generatePoints(historyData[key])}
-                fill="none"
-                stroke={
-                  key === 'soilMoisture'
-                    ? 'rgb(134, 65, 244)'
-                    : key === 'temperature'
-                    ? 'rgb(255, 99, 71)'
-                    : 'rgb(60, 179, 113)'
-                }
-                strokeWidth="2"
-              />
-            </Svg>
+              <Svg height="200" width={width}>
+                {/* 繪製折線 */}
+                <Polyline
+                  points={points}
+                  fill="none"
+                  stroke={
+                    key === 'soilMoisture'
+                      ? '#1abc9c'
+                      : key === 'temperature'
+                      ? '#f39c12'
+                      : '#3498db'
+                  }
+                  strokeWidth="2"
+                />
 
-            <View style={styles.labelContainer}>
-              {historyData[key].map((value, index) => (
-                <Text
-                  key={index}
-                  style={{
-                    width: (width-150) / historyData[key].length,
-                    marginHorizontal: 5, // 增加間隔
-                    textAlign: 'center',
-                    color: theme === 'light' ? '#000' : '#fff',
-                    fontSize: 12,
-                  }}
-                >
-                  {value} {key === 'soilMoisture' ? '%' : key === 'temperature' ? '°C' : '%'}
-                </Text>
-              ))}
+                {/* 添加數據點和標籤 */}
+                {labels.map((label, idx) => (
+                    <React.Fragment key={idx}>
+                    <Circle
+                      cx={label.x}
+                      cy={label.y}
+                      r="3"
+                      fill={
+                        key === 'soilMoisture'
+                          ? '#16a085' // 深綠色
+                          : key === 'temperature'
+                          ? '#e67e22' // 深橙色
+                          : '#2c98ff' // 深藍色
+                      }
+                    />
+                    <SvgText
+                      x={label.x-4}
+                      y={label.y - 13} // 標籤位置稍微上移
+                      fontSize="11"
+                      fill={theme === 'light' ? 'black' : 'white'}
+                      textAnchor="middle"
+                    >
+                      {label.value}
+                      {key === 'temperature' ? '°C' : '%'}
+                    </SvgText>
+                  </React.Fragment>
+                ))}
+              </Svg>
             </View>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.buttonContainer}>
-        <Button title="手動刷新數據" onPress={fetchSensorData} color="#1E90FF" />
+          );
+        })}
       </View>
     </ScrollView>
   );
 }
-
