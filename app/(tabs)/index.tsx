@@ -36,6 +36,20 @@ const AnimatedProgressBar = ({ progress, color }: { progress: number; color: str
   );
 };
 
+// 格式化時間的函式
+const formatTimestamp = (timestamp: string): string => {
+  const date = new Date(timestamp);
+  return new Intl.DateTimeFormat('zh-TW', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false, // 使用 24 小時制
+  }).format(date);
+};
+
 export default function IndexScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => getDynamicStyles(theme), [theme]);
@@ -47,6 +61,7 @@ export default function IndexScreen() {
   const soilMoisture = sensorData.soilMoisture;
   const temperature = sensorData.temperature;
   const humidity = sensorData.humidity;
+  const timestamp = sensorData.timestamp;
 
   // 計算進度條的比例值
   const validSoilMoisture = Math.round((soilMoisture / 100) * 100) / 100;
@@ -79,6 +94,11 @@ export default function IndexScreen() {
 
         <Text style={styles.title}>環境濕度: {humidity}%</Text>
         <AnimatedProgressBar progress={validHumidity} color="#3498db" />
+
+        {/* 顯示資料最後更新時間 */}
+        <Text style={styles.timestampText}>
+          資料最後更新時間: {formatTimestamp(timestamp)}
+        </Text>
       </View>
     </View>
   );
@@ -98,4 +118,10 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 5,
   },
+  timestampText: {
+    marginTop: 10,
+    fontSize: 10,
+    color: '#7f8c8d',
+  },
+
 });

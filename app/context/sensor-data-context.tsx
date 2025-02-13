@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { getDatabase, ref, onValue } from 'firebase/database';
+import app from "../configs/firebase-config";
 
 interface SensorData {
-  soilMoisture: number;
   temperature: number;
   humidity: number;
+  timestamp: string;
+  soilMoisture: number;  // 新增 soilMoisture 變數
 }
 
 interface SensorDataContextType {
@@ -15,7 +18,7 @@ interface SensorDataProviderProps {
   children: ReactNode;
 }
 
-const defaultSensorData: SensorData = { soilMoisture: 0, temperature: 0, humidity: 0 };
+const defaultSensorData: SensorData = { temperature: 0, humidity: 0, timestamp: '', soilMoisture: 0 };
 
 const SensorDataContext = createContext<SensorDataContextType | undefined>(undefined);
 
@@ -24,43 +27,41 @@ export const SensorDataProvider: React.FC<SensorDataProviderProps> = ({ children
 
   // 使用 useEffect 在組件加載時抓取數據
   useEffect(() => {
-    const fetchSensorData = async () => {
-      try {
-        const response = await fetch("http://192.168.50.11:8000/sensor/");
+    const db = getDatabase(app);
+    const sensorRef = ref(db, 'sensorData'); // 修改為 'sensorData'
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+    const unsubscribe = onValue(sensorRef, (snapshot) => {
+      const data = snapshot.val();
+      console.log("Received data from Firebase:", data);
 
-        const data = await response.json();
+      if (snapshot.exists()) {
+        const sensorDataArray = Object.values(data);
 
-        // 確保數據結構符合預期
-        if (data?.sensor_data) {
-          const { temperature, humidity, soil_moisture } = data.sensor_data;
+        // 按照 timestamp 排序數據，選擇最新的一筆
+        const latestSensorData = sensorDataArray
+          .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
 
-          // 更新 state 只有在數據有效時
+        // 安全檢查最新數據是否有效
+        if (latestSensorData && 'humidity' in latestSensorData && 'temperature_c' in latestSensorData) {
+          const { humidity, temperature_c, timestamp } = latestSensorData;
+          // 更新 sensorData，並保持 soilMoisture 預設為 0
           setSensorData({
-            temperature: temperature,
-            humidity: humidity,
-            soilMoisture: soil_moisture,
+            temperature: temperature_c,
+            humidity,
+            timestamp,
+            soilMoisture: 0,  // 預設為 0
           });
         } else {
-          console.error("Invalid data structure:", data);
+          console.error("Invalid data structure or missing fields in Firebase");
         }
-      } catch (error) {
-        console.error("Error fetching sensor data:", error);
+      } else {
+        console.error("No data available in Firebase");
       }
-    };
+    });
 
-    // 初次加載時調用一次 fetchSensorData
-    fetchSensorData();
-
-    // 設置每 3 秒更新一次
-    const intervalId = setInterval(fetchSensorData, 3000);
-
-    // 清理定時器
-    return () => clearInterval(intervalId);
-  }, []); // 空依賴陣列，表示只會在組件加載時開始定時器
+    // 清理監聽器
+    return () => unsubscribe();
+  }, []);
 
   return (
     <SensorDataContext.Provider value={{ sensorData, setSensorData }}>
@@ -77,5 +78,3 @@ export const useSensorData = (): SensorDataContextType => {
   return context;
 };
 
-export default function SensorContextScreen() {
-}

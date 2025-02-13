@@ -77,8 +77,15 @@ export const getDynamicStyles = (theme: 'light' | 'dark') => {
       sensorDataContainer: {
         marginTop: 100,
       },
+      timestampText: {
+        marginTop: 20,
+        fontSize: 11,
+        color: theme === 'light' ? '#25292e' : '#fff', // 文字顏色根據主題設置
+        textAlign: 'right',
+      },
   };
 };
 
 export default function DynamicStylesScreen() {
+  
 }
