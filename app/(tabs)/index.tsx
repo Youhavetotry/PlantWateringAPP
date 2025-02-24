@@ -10,11 +10,10 @@ const AnimatedProgressBar = ({ progress, color }: { progress: number; color: str
   const animatedWidth = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // 以動畫方式更新進度
     Animated.timing(animatedWidth, {
-      toValue: clampedProgress * 100, // 將比例轉為百分比
-      duration: 500, // 動畫持續時間
-      useNativeDriver: false, // 使用非原生動畫處理寬度變化
+      toValue: clampedProgress * 100,
+      duration: 500,
+      useNativeDriver: false,
     }).start();
   }, [clampedProgress]);
 
@@ -55,17 +54,15 @@ export default function IndexScreen() {
   const styles = useMemo(() => getDynamicStyles(theme), [theme]);
 
   // 從 SensorDataProvider 獲取感測器數據
-  const { sensorData } = useSensorData();
-
-  // 處理感測器數據
-  const soilMoisture = sensorData.soilMoisture;
-  const temperature = sensorData.temperature;
-  const humidity = sensorData.humidity;
-  const timestamp = sensorData.timestamp;
+  const { sensorData } = useSensorData() || {};
+  const soilMoisture = sensorData?.soilMoisture ?? 0;
+  const temperature = sensorData?.temperature ?? 0;
+  const humidity = sensorData?.humidity ?? 0;
+  const timestamp = sensorData?.timestamp ?? new Date().toISOString();
 
   // 計算進度條的比例值
   const validSoilMoisture = Math.round((soilMoisture / 100) * 100) / 100;
-  const validTemperature = Math.round((temperature / 40) * 100) / 100;
+  const validTemperature = Math.min(1, Math.max(0, temperature / 40));
   const validHumidity = Math.round((humidity / 100) * 100) / 100;
 
   return (
@@ -97,7 +94,7 @@ export default function IndexScreen() {
 
         {/* 顯示資料最後更新時間 */}
         <Text style={styles.timestampText}>
-          資料最後更新時間: {formatTimestamp(timestamp)}
+          資料最後更新時間: {timestamp ? formatTimestamp(timestamp) : "無資料"}
         </Text>
       </View>
     </View>
@@ -117,11 +114,6 @@ const styles = StyleSheet.create({
   progressBarFill: {
     height: '100%',
     borderRadius: 5,
-  },
-  timestampText: {
-    marginTop: 10,
-    fontSize: 10,
-    color: '#7f8c8d',
   },
 
 });
