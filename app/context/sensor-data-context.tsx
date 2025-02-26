@@ -78,4 +78,3 @@ export const useSensorData = (): SensorDataContextType => {
   return context;
 };
 
-export default SensorDataContext;
