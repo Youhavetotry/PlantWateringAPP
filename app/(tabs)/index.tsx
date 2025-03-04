@@ -1,8 +1,12 @@
-import React, { useMemo, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 import { useTheme } from '../style/theme-context';
 import { getDynamicStyles } from "../style/dynamic-style";
 import { useSensorData } from '../context/sensor-data-context';
+import { database } from "../configs/firebase-config";
+import { ref, set, onValue, update } from "firebase/database";
+
+
 
 // 帶動畫的自定義進度條元件
 const AnimatedProgressBar = ({ progress, color }: { progress: number; color: string }) => {
@@ -65,14 +69,80 @@ export default function IndexScreen() {
   const validTemperature = Math.min(1, Math.max(0, temperature / 40));
   const validHumidity = Math.round((humidity / 100) * 100) / 100;
 
-  return (
-    <View style={styles.container}>
-      {/* 澆水開關按鈕 */}
-      <View style={styles.WateringButtonContainer}>
-        <TouchableOpacity onPress={() => {}} style={[styles.button]}>
-          <Text style={{ color: theme === 'light' ? '#fff' : '#000' }}>澆水開關</Text>
-        </TouchableOpacity>
-      </View>
+
+ // 兩個水泵的狀態
+ const [waterPump1Status, setWaterPump1Status] = useState<string>('OFF');
+ const [waterPump2Status, setWaterPump2Status] = useState<string>('OFF');
+ const [loading, setLoading] = useState<{ pump1: boolean; pump2: boolean }>({ pump1: false, pump2: false });
+
+ useEffect(() => {
+   // 監聽 Firebase 內的水泵狀態
+   const pump1Ref = ref(database, "waterPump/pump1");
+   const pump2Ref = ref(database, "waterPump/pump2");
+
+   onValue(pump1Ref, (snapshot) => {
+     const status = snapshot.val();
+     setWaterPump1Status(status || "OFF"); // 設定 pump1 狀態
+   });
+
+   onValue(pump2Ref, (snapshot) => {
+     const status = snapshot.val();
+     setWaterPump2Status(status || "OFF"); // 設定 pump2 狀態
+   });
+
+ }, []);
+
+ const toggleWaterPump = async (pump: 'pump1' | 'pump2') => {
+  setLoading((prev) => ({ ...prev, [pump]: true }));
+  try {
+    // 切換水泵狀態
+    const newStatus = (pump === 'pump1' ? waterPump1Status : waterPump2Status) === "ON" ? "OFF" : "ON";
+
+    // 使用 update 來僅更新指定的 pump 狀態
+    await update(ref(database, 'waterPump'), {
+      [pump]: newStatus,  // 僅更新對應的 pump
+    });
+
+    // 確保更新後 UI 和 Firebase 狀態同步
+    if (pump === 'pump1') {
+      setWaterPump1Status(newStatus);
+    } else {
+      setWaterPump2Status(newStatus);
+    }
+  } catch (error) {
+    console.error(`更新 ${pump} 狀態失敗`, error);
+  }
+  setLoading((prev) => ({ ...prev, [pump]: false }));
+};
+
+ return (
+   <View style={styles.container}>
+     {/* 兩個水泵開關按鈕 */}
+     <View style={styles.buttonContainer}>
+       <TouchableOpacity 
+         onPress={() => toggleWaterPump('pump1')} 
+         style={[styles.button, waterPump1Status === "ON" ? styles.activeButton : null]}
+         disabled={loading.pump1}
+       >
+         {loading.pump1 ? (
+           <ActivityIndicator color="#fff" />
+         ) : (
+           <Text style={styles.buttonText}>水泵 1 ({waterPump1Status})</Text>
+         )}
+       </TouchableOpacity>
+
+       <TouchableOpacity 
+         onPress={() => toggleWaterPump('pump2')} 
+         style={[styles.button, waterPump2Status === "ON" ? styles.activeButton : null]}
+         disabled={loading.pump2}
+       >
+         {loading.pump2 ? (
+           <ActivityIndicator color="#fff" />
+         ) : (
+           <Text style={styles.buttonText}>水泵 2 ({waterPump2Status})</Text>
+         )}
+       </TouchableOpacity>
+     </View>
 
       {/* 通知按鈕 */}
       <View style={styles.notificationButtonContainer}>

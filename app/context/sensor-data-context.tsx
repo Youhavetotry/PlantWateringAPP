@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { getDatabase, ref, onValue } from 'firebase/database';
-import app from "../configs/firebase-config";
+import { app } from "../configs/firebase-config";
 
 interface SensorData {
   temperature: number;
   humidity: number;
   timestamp: string;
-  soilMoisture: number;  // 新增 soilMoisture 變數
+  soilMoisture: number;
 }
 
 interface SensorDataContextType {
@@ -25,31 +25,27 @@ const SensorDataContext = createContext<SensorDataContextType | undefined>(undef
 export const SensorDataProvider: React.FC<SensorDataProviderProps> = ({ children }) => {
   const [sensorData, setSensorData] = useState<SensorData>(defaultSensorData);
 
-  // 使用 useEffect 在組件加載時抓取數據
   useEffect(() => {
     const db = getDatabase(app);
-    const sensorRef = ref(db, 'sensorData'); // 修改為 'sensorData'
+    const sensorRef = ref(db, 'sensorData');
 
     const unsubscribe = onValue(sensorRef, (snapshot) => {
       const data = snapshot.val();
-      console.log("Received data from Firebase:", data);
 
       if (snapshot.exists()) {
         const sensorDataArray = Object.values(data);
 
-        // 按照 timestamp 排序數據，選擇最新的一筆
         const latestSensorData = sensorDataArray
           .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
 
-        // 安全檢查最新數據是否有效
         if (latestSensorData && 'humidity' in latestSensorData && 'temperature_c' in latestSensorData) {
-          const { humidity, temperature_c, timestamp } = latestSensorData;
-          // 更新 sensorData，並保持 soilMoisture 預設為 0
+          const { humidity, temperature_c, timestamp, soil_moisture } = latestSensorData;
+
           setSensorData({
             temperature: temperature_c,
             humidity,
             timestamp,
-            soilMoisture: 0,  // 預設為 0
+            soilMoisture: soil_moisture ?? 0,  // 從 Firebase 讀取，若不存在則預設為 0
           });
         } else {
           console.error("Invalid data structure or missing fields in Firebase");
@@ -59,7 +55,6 @@ export const SensorDataProvider: React.FC<SensorDataProviderProps> = ({ children
       }
     });
 
-    // 清理監聽器
     return () => unsubscribe();
   }, []);
 
@@ -77,4 +72,3 @@ export const useSensorData = (): SensorDataContextType => {
   }
   return context;
 };
-

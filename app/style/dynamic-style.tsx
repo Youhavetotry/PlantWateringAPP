@@ -47,6 +47,9 @@ export const getDynamicStyles = (theme: 'light' | 'dark') => {
         marginTop: 20,
         marginBottom: 20,
         paddingHorizontal: 20,
+        position: 'absolute',
+        top: 0,
+        left: 0,
       },
       dataContainer: {
         marginBottom:20,
@@ -66,8 +69,11 @@ export const getDynamicStyles = (theme: 'light' | 'dark') => {
       },
       notificationButtonContainer: {
         position: 'absolute',
-        top: 40,
-        right: 20,
+        top: 0,
+        right: 0,
+        marginTop: 20,
+        marginBottom: 20,
+        paddingHorizontal: 20,
       },
       WateringButtonContainer: {
         position: 'absolute',
@@ -82,6 +88,15 @@ export const getDynamicStyles = (theme: 'light' | 'dark') => {
         fontSize: 11,
         color: theme === 'light' ? '#25292e' : '#fff', // 文字顏色根據主題設置
         textAlign: 'right',
+      },
+      activeButton: {
+        backgroundColor: '#e74c3c', // 當水泵開啟時，按鈕變紅
+        padding: 10,
+        borderRadius: 5,
+      },
+      buttonText: {
+        color: '#fff',
+        fontSize: 16,
       },
   };
 };
