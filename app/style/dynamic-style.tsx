@@ -47,7 +47,7 @@ export const getDynamicStyles = (theme: 'light' | 'dark') => {
         marginTop: 20,
         marginBottom: 20,
         paddingHorizontal: 20,
-        position: 'absolute',
+        position: 'absolute' as const,
         top: 0,
         left: 0,
       },
@@ -95,7 +95,7 @@ export const getDynamicStyles = (theme: 'light' | 'dark') => {
         borderRadius: 5,
       },
       buttonText: {
-        color: '#fff',
+        color: theme === 'light' ? '#fff' : '#25292e',
         fontSize: 16,
       },
   };

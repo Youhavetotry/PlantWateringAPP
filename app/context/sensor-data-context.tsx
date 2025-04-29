@@ -38,8 +38,13 @@ export const SensorDataProvider: React.FC<SensorDataProviderProps> = ({ children
         const latestSensorData = sensorDataArray
           .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
 
-        if (latestSensorData && 'humidity' in latestSensorData && 'temperature_c' in latestSensorData) {
-          const { humidity, temperature_c, timestamp, soil_moisture } = latestSensorData;
+        if (latestSensorData && typeof latestSensorData === 'object' && latestSensorData !== null) {
+          const { humidity, temperature_c, timestamp, soil_moisture } = latestSensorData as {
+            humidity: number;
+            temperature_c: number;
+            timestamp: string;
+            soil_moisture?: number;
+          };
 
           setSensorData({
             temperature: temperature_c,
