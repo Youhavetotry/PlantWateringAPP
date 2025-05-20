@@ -1,10 +1,11 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, ActivityIndicator, Modal, Button, FlatList } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, ActivityIndicator, Modal, Button, FlatList, ScrollView } from 'react-native';
 import Slider from '@react-native-community/slider';
 import * as Notifications from 'expo-notifications';
 import { useTheme } from '../style/theme-context';
 import { getDynamicStyles } from "../style/dynamic-style";
-import { notificationStyles } from '../style/notification-style';
+import { getNotificationStyles } from '../style/notification-style';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSensorData } from '../context/sensor-data-context';
 import { database } from "../configs/firebase-config";
@@ -77,10 +78,54 @@ type Notification = {
 };
 
 export default function IndexScreen() {
+  // --- 水泵控制相關 state/ref 統一宣告 ---
+  const [isWatering, setIsWatering] = useState<{ [key in 'pump1' | 'pump2']: boolean }>({ pump1: false, pump2: false });
+  const pumpStartTimeRef = useRef<{ [key in 'pump1' | 'pump2']: number }>({ pump1: 0, pump2: 0 });
+  const pumpTimeoutTriggeredRef = useRef<{ [key in 'pump1' | 'pump2']: boolean }>({ pump1: false, pump2: false });
+  const wateringTimeoutRef = useRef<{ [key in 'pump1' | 'pump2']: NodeJS.Timeout | null }>({ pump1: null, pump2: null });
+  const wateringUnsubscribeRef = useRef<{ [key in 'pump1' | 'pump2']: (() => void) | null }>({ pump1: null, pump2: null });
+  const soilMoistureRef = ref(database, 'sensorData/latest');
+  const [confirmModal, setConfirmModal] = useState<{visible: boolean, pump: 'pump1' | 'pump2' | null}>({visible: false, pump: null});
+
   // --- 門檻設定 state ---
-  const [soilMoistureThreshold, setSoilMoistureThreshold] = useState(10);
-  const [temperatureThreshold, setTemperatureThreshold] = useState(30);
+  const [soilMoistureThreshold, setSoilMoistureThreshold] = useState(15);
+  const [temperatureThreshold, setTemperatureThreshold] = useState(32);
   const [humidityThreshold, setHumidityThreshold] = useState(20);
+
+  // 土壤濕度、溫度與環境濕度門檻：APP 啟動時從 AsyncStorage 讀取
+  useEffect(() => {
+    (async () => {
+      try {
+        const soil = await AsyncStorage.getItem('soilMoistureThreshold');
+        if (soil !== null) {
+          setSoilMoistureThreshold(Number(soil));
+        }
+        const temp = await AsyncStorage.getItem('temperatureThreshold');
+        if (temp !== null) {
+          setTemperatureThreshold(Number(temp));
+        }
+        const hum = await AsyncStorage.getItem('humidityThreshold');
+        if (hum !== null) {
+          setHumidityThreshold(Number(hum));
+        }
+      } catch (e) {
+        // 讀取失敗時，仍使用預設值
+      }
+    })();
+  }, []);
+
+  // 當 soilMoistureThreshold 變動時寫入 AsyncStorage
+  useEffect(() => {
+    AsyncStorage.setItem('soilMoistureThreshold', soilMoistureThreshold.toString());
+  }, [soilMoistureThreshold]);
+  // 當 temperatureThreshold 變動時寫入 AsyncStorage
+  useEffect(() => {
+    AsyncStorage.setItem('temperatureThreshold', temperatureThreshold.toString());
+  }, [temperatureThreshold]);
+  // 當 humidityThreshold 變動時寫入 AsyncStorage
+  useEffect(() => {
+    AsyncStorage.setItem('humidityThreshold', humidityThreshold.toString());
+  }, [humidityThreshold]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingType, setEditingType] = useState<'soil' | 'temp' | 'humidity' | null>(null);
   const [tempValue, setTempValue] = useState(0); // 用於 Slider 調整暫存
@@ -107,18 +152,9 @@ export default function IndexScreen() {
   const checkAndNotify = () => {
     // 防呆：sensorData 尚未初始化時不推播
     if (!sensorData || soilMoisture === 0 && temperature === 0 && humidity === 0) {
-      console.log('[DEBUG] 跳過通知：感測值未初始化', { soilMoisture, temperature, humidity, sensorData });
+      
       return;
     }
-    console.log('[DEBUG] checkAndNotify 執行', {
-      soilMoisture,
-      temperature,
-      humidity,
-      soilMoistureThreshold,
-      temperatureThreshold,
-      humidityThreshold,
-      cooldown: notificationCooldown.current
-    });
     const now = new Date().toISOString();
     // 土壤濕度
     if (soilMoisture <= soilMoistureThreshold && !notificationCooldown.current.soil) {
@@ -133,10 +169,10 @@ export default function IndexScreen() {
         ...prev
       ]);
       notificationCooldown.current.soil = true;
-      setTimeout(() => { notificationCooldown.current.soil = false; }, 60 * 60 * 1000); // 1小時冷卻
+      setTimeout(() => { notificationCooldown.current.soil = false; }, 3 * 60 * 60 * 1000); // 3小時冷卻
     }
     // 溫度
-    console.log('[DEBUG] 高溫條件判斷', { temp: temperature, cd: notificationCooldown.current.temp, result: temperature >= 32 && !notificationCooldown.current.temp });
+    
     if (temperature >= 32 && !notificationCooldown.current.temp) {
       const title = '植物提醒';
       const body = `溫度過高（≥${temperatureThreshold}°C），請注意降溫！`;
@@ -144,16 +180,16 @@ export default function IndexScreen() {
         content: { title, body },
         trigger: null,
       }).then(() => {
-        console.log('[DEBUG] 通知已發送');
+        
       }).catch(e => {
-        console.log('[DEBUG] 通知發送失敗', e);
+        
       });
       setNotifications(prev => [
         { id: `${now}-temp`, title, body, read: false, timestamp: now },
         ...prev
       ]);
       notificationCooldown.current.temp = true;
-      setTimeout(() => { notificationCooldown.current.temp = false; }, 60 * 60 * 1000);
+      setTimeout(() => { notificationCooldown.current.temp = false; }, 4 * 60 * 60 * 1000); // 4小時冷卻
     }
     // 環境濕度
     if (humidity <= humidityThreshold && !notificationCooldown.current.humidity) {
@@ -168,7 +204,7 @@ export default function IndexScreen() {
         ...prev
       ]);
       notificationCooldown.current.humidity = true;
-      setTimeout(() => { notificationCooldown.current.humidity = false; }, 60 * 60 * 1000);
+      setTimeout(() => { notificationCooldown.current.humidity = false; }, 4 * 60 * 60 * 1000); // 4小時冷卻
     }
   };
 
@@ -179,7 +215,8 @@ export default function IndexScreen() {
 
   const { theme } = useTheme();
   const styles = useMemo(() => getDynamicStyles(theme), [theme]);
-  console.log('styles keys:', Object.keys(styles));
+  const notificationStyles = useMemo(() => getNotificationStyles(theme), [theme]);
+  
   // 計算進度條的比例值
   const validSoilMoisture = Math.round((soilMoisture / 100) * 100) / 100;
   const validTemperature = Math.min(1, Math.max(0, temperature / 40));
@@ -190,6 +227,44 @@ export default function IndexScreen() {
   const [waterPump2Status, setWaterPump2Status] = useState<string>('OFF');
   const [loading, setLoading] = useState<{ pump1: boolean; pump2: boolean }>({ pump1: false, pump2: false });
   const [cooldown, setCooldown] = useState<{ pump1: boolean; pump2: boolean }>({ pump1: false, pump2: false });
+
+  // 擴充資訊：澆水次數統計
+  const [wateringStats, setWateringStats] = useState({ todayCount: 0, weekCount: 0, lastWateringTimestamp: null as string | null });
+  // 每次啟動水泵時更新澆水次數
+  const updateWateringStats = () => {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const weekStart = (() => {
+      const d = new Date(now);
+      d.setDate(now.getDate() - now.getDay());
+      return d.toISOString().split('T')[0];
+    })();
+    setWateringStats(prev => {
+      const newStats = { ...prev };
+      if (!prev.lastWateringTimestamp || prev.lastWateringTimestamp.split('T')[0] !== today) {
+        newStats.todayCount = 1;
+      } else {
+        newStats.todayCount += 1;
+      }
+      if (!prev.lastWateringTimestamp || prev.lastWateringTimestamp.split('T')[0] < weekStart) {
+        newStats.weekCount = 1;
+      } else {
+        newStats.weekCount += 1;
+      }
+      newStats.lastWateringTimestamp = now.toISOString();
+      // 寫入 AsyncStorage
+      AsyncStorage.setItem('wateringStats', JSON.stringify(newStats));
+      return newStats;
+    });
+  };
+
+  // 啟動時讀取澆水統計
+  useEffect(() => {
+    (async () => {
+      const stats = await AsyncStorage.getItem('wateringStats');
+      if (stats) setWateringStats(JSON.parse(stats));
+    })();
+  }, []);
 
   useEffect(() => {
     // 監聽 Firebase 內的水泵狀態更新 (如果狀態被樹莓派自動改回 OFF，也會更新)
@@ -209,69 +284,131 @@ export default function IndexScreen() {
 
   }, []);
 
-  const toggleWaterPump = async (pump: 'pump1' | 'pump2') => {
-    if (cooldown[pump]) return; // 如果處於冷卻狀態則不執行
+// --- 更新水泵狀態 ---
+const updatePumpStatus = async (pump: 'pump1' | 'pump2', status: 'ON' | 'OFF') => {
+  await update(ref(database, 'waterPump'), { [pump]: status });
+  if (pump === 'pump1') setWaterPump1Status(status);
+  else setWaterPump2Status(status);
+};
 
-    // 開始冷卻（10秒）
-    setCooldown((prev) => ({ ...prev, [pump]: true }));
-    setLoading((prev) => ({ ...prev, [pump]: true }));
+// --- 停止水泵 ---
+const stopWaterPump = (pump: 'pump1' | 'pump2', reason: 'manual' | 'auto' | 'timeout' = 'manual') => {
+  updatePumpStatus(pump, "OFF");
+  setIsWatering(prev => ({ ...prev, [pump]: false }));
+  if (wateringUnsubscribeRef.current[pump]) {
+    wateringUnsubscribeRef.current[pump]!();
+    wateringUnsubscribeRef.current[pump] = null;
+  }
+  if (wateringTimeoutRef.current[pump]) {
+    clearTimeout(wateringTimeoutRef.current[pump]!);
+    wateringTimeoutRef.current[pump] = null;
+  }
+  const elapsedTime = Math.round((Date.now() - pumpStartTimeRef.current[pump]) / 1000);
+  if (reason === 'manual') {
+    const now = new Date().toISOString();
+    const title = `水泵 ${pump === 'pump1' ? '1' : '2'} 已手動停止`;
+    const body = `運行時間：${elapsedTime} 秒\n原因：使用者手動停止`;
+    Notifications.scheduleNotificationAsync({
+      content: { title, body },
+      trigger: null,
+    });
+    setNotifications(prev => [
+      { id: `${now}-pump-${pump}`, title, body, read: false, timestamp: now },
+      ...prev
+    ]);
+  }
+};
 
-    try {
-      // 當按下按鈕，將水泵狀態更新為 "ON" 到 Firebase
-      await update(ref(database, 'waterPump'), {
-        [pump]: "ON",
-      });
-      // 選擇同步更新本地狀態 (雖然 onValue 會自動更新)
-      if (pump === 'pump1') {
-        setWaterPump1Status("ON");
-      } else {
-        setWaterPump2Status("ON");
+// --- 啟動/切換水泵 ---
+const toggleWaterPump = async (pump: 'pump1' | 'pump2') => {
+  updateWateringStats();
+  if (cooldown[pump]) return;
+  if (isWatering[pump]) {
+    stopWaterPump(pump); // 手動強制停止
+    return;
+  }
+  pumpStartTimeRef.current[pump] = Date.now();
+  pumpTimeoutTriggeredRef.current[pump] = false;
+  try {
+    await updatePumpStatus(pump, "ON");
+    setIsWatering(prev => ({ ...prev, [pump]: true }));
+    const maxWateringTime = 30000;
+    const unsubscribe = onValue(soilMoistureRef, (snapshot) => {
+      const currentMoisture = snapshot.val()?.moisture;
+      const elapsedTime = Date.now() - pumpStartTimeRef.current[pump];
+      if (typeof currentMoisture === 'number' && currentMoisture >= 45) {
+        stopWaterPump(pump, 'auto');
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: `水泵 ${pump === 'pump1' ? '1' : '2'} 已自動停止`,
+            body: `運行時間：${Math.round(elapsedTime / 1000)} 秒\n原因：土壤濕度達標 (>45%)`,
+          },
+          trigger: null,
+        });
       }
+    });
+    wateringUnsubscribeRef.current[pump] = unsubscribe;
+    const timeout = setTimeout(() => {
+      pumpTimeoutTriggeredRef.current[pump] = true;
+      stopWaterPump(pump, 'timeout');
+      const now = new Date().toISOString();
+      const title = `水泵 ${pump === 'pump1' ? '1' : '2'} 已自動停止`;
+      const body = `運行時間：30 秒\n原因：超過最大澆水時間`;
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+        },
+        trigger: null,
+      });
+      setNotifications(prev => [
+        { id: `${now}-timeout-${pump}`, title, body, read: false, timestamp: now },
+        ...prev
+      ]);
+    }, maxWateringTime);
+    wateringTimeoutRef.current[pump] = timeout;
+  } catch (error) {
+    setIsWatering(prev => ({ ...prev, [pump]: false }));
+  }
+};
 
-      // 5秒後自動更新 Firebase 水泵狀態為 "OFF"
-      setTimeout(async () => {
-        try {
-          await update(ref(database, 'waterPump'), {
-            [pump]: "OFF",
-          });
-          if (pump === 'pump1') {
-            setWaterPump1Status("OFF");
-          } else {
-            setWaterPump2Status("OFF");
-          }
-        } catch (error) {
-          console.error(`自動關閉 ${pump} 失敗`, error);
-        }
-      }, 5000);
+// --- 處理水泵按鈕點擊 ---
+const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
+  if (isWatering[pump]) {
+    stopWaterPump(pump);
+    return;
+  }
+  if (soilMoisture > 40) {
+    setConfirmModal({ visible: true, pump });
+  } else {
+    toggleWaterPump(pump);
+  }
+};
 
-      // 10秒後解除冷卻
-      setTimeout(() => {
-        setCooldown((prev) => ({ ...prev, [pump]: false }));
-      }, 10000);
+  // --- 最大澆水時間（秒） ---
+  const maxWateringTime = 30; // 30秒
 
-    } catch (error) {
-      console.error(`更新 ${pump} 狀態失敗`, error);
-    }
-    setLoading((prev) => ({ ...prev, [pump]: false }));
-  };
 
-  // 根據土壤濕度禁用按鈕 (當 soilMoisture 大於 50 時，按鈕一直禁用)
-  const isButtonDisabled = soilMoisture > 50;
+  // --- 禁用按鈕條件 ---
+  const isButtonDisabled = soilMoisture > 70;
 
-  // 未讀通知數
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // --- 未讀通知數 ---
+  const unreadCount = notifications.filter((n: Notification) => !n.read).length;
 
-  // 標記單筆為已讀
+  // --- 單筆標記為已讀 ---
   const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    setNotifications((prev: Notification[]) => prev.map((n: Notification) => n.id === id ? { ...n, read: true } : n));
   };
-  // 全部標記為已讀
+  // --- 全部標記為已讀 ---
   const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setNotifications((prev: Notification[]) => prev.map((n: Notification) => ({ ...n, read: true })));
   };
+
+  // --- 其餘缺失的宣告補充於頂部 ---
+  // 已於頂部統一宣告: pumpStartTimeRef, wateringTimeoutRef, wateringUnsubscribeRef, pumpTimeoutTriggeredRef, cooldown, loading, soilMoisture, temperature, humidity, timestamp, notifications, setNotifications, dropdownVisible, setDropdownVisible, validSoilMoisture, validTemperature, validHumidity, styles, notificationStyles
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { flex: 1 }]}>
       {/* 通知鈴鐺按鈕（右上角） */}
       <View style={notificationStyles.bellContainer}>
         <TouchableOpacity style={notificationStyles.bellButton} onPress={() => setDropdownVisible(v => !v)}>
@@ -284,8 +421,12 @@ export default function IndexScreen() {
         </TouchableOpacity>
         {/* 通知下拉列表 */}
         {dropdownVisible && (
-          <View style={notificationStyles.notificationDropdown}>
-            <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>未讀通知</Text>
+          <View style={[
+          notificationStyles.notificationDropdown,
+          theme === 'dark' && { backgroundColor: '#23272F' }
+        ]}>
+
+            <Text style={[notificationStyles.notificationTitle, { fontSize: 16, marginBottom: 8 }]}>未讀通知</Text>
             {notifications.length === 0 && (
               <Text style={{ color: '#888', textAlign: 'center', marginVertical: 20 }}>目前沒有通知</Text>
             )}
@@ -316,7 +457,7 @@ export default function IndexScreen() {
       {/* 兩個水泵開關按鈕 */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity 
-          onPress={() => toggleWaterPump('pump1')} 
+          onPress={() => handleWaterPumpPress('pump1')} 
           style={[styles.button, waterPump1Status === "ON" ? styles.activeButton : null]}
           disabled={loading.pump1 || isButtonDisabled || cooldown.pump1}
         >
@@ -328,7 +469,7 @@ export default function IndexScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity 
-          onPress={() => toggleWaterPump('pump2')} 
+          onPress={() => handleWaterPumpPress('pump2')} 
           style={[styles.button, waterPump2Status === "ON" ? styles.activeButton : null]}
           disabled={loading.pump2 || isButtonDisabled || cooldown.pump2}
         >
@@ -341,41 +482,118 @@ export default function IndexScreen() {
       </View>
 
       {/* 顯示土壤濕度、溫度、濕度進度條 */}
-      <View style={styles.sensorDataContainer}>
-        {/* 土壤濕度區塊 */}
-        <TouchableOpacity onPress={() => { setEditingType('soil'); setTempValue(soilMoistureThreshold); setModalVisible(true); }}>
-          <Text style={{ ...styles.title, fontWeight: 'bold' as 'bold', textAlign: 'center' as 'center' }}>土壤濕度: {soilMoisture}%</Text>
-          <AnimatedProgressBar progress={validSoilMoisture} color="#1abc9c" />
-        </TouchableOpacity>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 32 }}>
+        <View style={styles.sensorDataContainer}>
+          {/* 土壤濕度區塊 */}
+          <TouchableOpacity onPress={() => { setEditingType('soil'); setTempValue(soilMoistureThreshold); setModalVisible(true); }}>
+            <Text style={{ ...styles.title, fontWeight: 'bold' as 'bold', textAlign: 'center' as 'center' }}>土壤濕度: {soilMoisture}%</Text>
+            <AnimatedProgressBar progress={validSoilMoisture} color="#1abc9c" />
+          </TouchableOpacity>
 
-        {/* 溫度區塊 */}
-        <TouchableOpacity onPress={() => { setEditingType('temp'); setTempValue(temperatureThreshold); setModalVisible(true); }}>
-          <Text style={{ ...styles.title, fontWeight: 'bold' as 'bold', textAlign: 'center' as 'center' }}>溫度: {temperature}°C</Text>
-          <AnimatedProgressBar progress={validTemperature} color="#f39c12" />
-        </TouchableOpacity>
+          {/* 溫度區塊 */}
+          <TouchableOpacity onPress={() => { setEditingType('temp'); setTempValue(temperatureThreshold); setModalVisible(true); }}>
+            <Text style={{ ...styles.title, fontWeight: 'bold' as 'bold', textAlign: 'center' as 'center' }}>溫度: {temperature}°C</Text>
+            <AnimatedProgressBar progress={validTemperature} color="#f39c12" />
+          </TouchableOpacity>
 
-        {/* 環境濕度區塊 */}
-        <TouchableOpacity onPress={() => { setEditingType('humidity'); setTempValue(humidityThreshold); setModalVisible(true); }}>
-          <Text style={{ ...styles.title, fontWeight: 'bold' as 'bold', textAlign: 'center' as 'center' }}>環境濕度: {humidity}%</Text>
-          <AnimatedProgressBar progress={validHumidity} color="#3498db" />
-        </TouchableOpacity>
+          {/* 環境濕度區塊 */}
+          <TouchableOpacity onPress={() => { setEditingType('humidity'); setTempValue(humidityThreshold); setModalVisible(true); }}>
+            <Text style={{ ...styles.title, fontWeight: 'bold' as 'bold', textAlign: 'center' as 'center' }}>環境濕度: {humidity}%</Text>
+            <AnimatedProgressBar progress={validHumidity} color="#3498db" />
+          </TouchableOpacity>
 
-        {/* 顯示資料最後更新時間 */}
-        <Text style={{ ...styles.timestampText, textAlign: 'center' as 'center' }}>
-          資料最後更新時間: {timestamp ? formatTimestamp(timestamp) : "無資料"}
-        </Text>
-
-        {/* DEBUG: 重置通知冷卻按鈕 */}
-        <View style={{ alignItems: 'center', marginTop: 10 }}>
-          <Button title="重置通知冷卻" color="#e67e22" onPress={() => {
-            notificationCooldown.current.soil = false;
-            notificationCooldown.current.temp = false;
-            notificationCooldown.current.humidity = false;
-            console.log('[DEBUG] 已重置 cooldown', notificationCooldown.current);
-            checkAndNotify();
-          }} />
+          {/* 顯示資料最後更新時間 */}
+          <Text style={{ ...styles.timestampText, textAlign: 'right' as 'right', marginBottom: 20 }}>
+            資料最後更新時間: {timestamp ? formatTimestamp(timestamp) : "無資料"}
+          </Text>
+          {/* 擴充資訊卡片區塊 */}
+          {/* 水平排列的卡片區塊 */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'stretch', marginTop: 24, marginBottom: 24, paddingBottom: 0 }}>
+            {/* 植物健康提示卡片 */}
+            <View style={{
+              flex: 1,
+              backgroundColor: theme === 'dark' ? '#29352f' : '#f9fbe7',
+              height: 130,
+              borderRadius: 14,
+              padding: 14,
+              marginRight: 8,
+              shadowColor: theme === 'dark' ? '#111' : '#ccc',
+              shadowOpacity: 0.18,
+              shadowRadius: 5,
+              elevation: 2,
+              minWidth: 0,
+            }}>
+              <Text style={{ fontWeight: 'bold', fontSize: 15, color: theme === 'dark' ? '#b7e4c7' : '#689f38', marginBottom: 12 }}>🌱 植物健康提示</Text>
+              <Text style={{ color: theme === 'dark' ? '#d0e2cf' : '#666', fontSize: 11.5, marginLeft: 4}}>
+                {soilMoisture < soilMoistureThreshold ? '⚠️ 土壤偏乾，建議立即澆水。\n' : ''}
+                {temperature > temperatureThreshold ? '⚠️ 溫度偏高，注意通風降溫。\n' : ''}
+                {humidity < humidityThreshold ? '⚠️ 濕度偏低，建議加濕。\n' : ''}
+                {soilMoisture >= soilMoistureThreshold && temperature <= temperatureThreshold && humidity >= humidityThreshold ? '👍 植物狀態良好，請持續保持！' : ''}
+              </Text>
+            </View>
+            {/* 澆水次數統計卡片 */}
+            <View style={{
+              flex: 1,
+              backgroundColor: theme === 'dark' ? '#222c38' : '#e3f2fd',
+              height: 130,
+              borderRadius: 14,
+              padding: 14,
+              marginLeft: 8,
+              shadowColor: theme === 'dark' ? '#111' : '#ccc',
+              shadowOpacity: 0.18,
+              shadowRadius: 5,
+              elevation: 2,
+              minWidth: 0,
+            }}>
+              <Text style={{ fontWeight: 'bold', fontSize: 15, color: theme === 'dark' ? '#90caf9' : '#1976d2', marginBottom: 12 }}>💧 澆水次數統計</Text>
+              <Text style={{ color: theme === 'dark' ? '#b0bec5' : '#555', fontSize: 11.5, marginBottom: 4 , marginLeft: 4}}>今日澆水次數：{wateringStats?.todayCount ?? 0} </Text>
+              <Text style={{ color: theme === 'dark' ? '#b0bec5' : '#555', fontSize: 11.5, marginBottom: 4 , marginLeft: 4}}>本週澆水次數：{wateringStats?.weekCount ?? 0} </Text>
+            </View>
+          </View>
         </View>
-      </View>
+      </ScrollView>
+      {/* 土壤濕度大於40% 的澆水確認提示框（與溫度警告提示框風格一致） */}
+      <Modal visible={confirmModal.visible} transparent animationType="slide">
+        <View style={{ flex:1, justifyContent:'center', alignItems:'center', backgroundColor:'rgba(0,0,0,0.2)' }}>
+          <View style={{
+            width: '80%',
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 24,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.2,
+            shadowRadius: 8,
+            elevation: 5,
+            alignItems: 'center',
+          }}>
+            <Text style={{ color: '#e67e22', fontSize: 16, fontWeight: 'bold', marginTop: 8, marginBottom: 8, textAlign: 'center' }}>
+              土壤濕度已高於 40%
+            </Text>      
+            <Text style={{ 
+              color: '#333', 
+              fontSize: 15, 
+              textAlign: 'center', 
+              marginBottom: 16, 
+              lineHeight: 22, 
+              width: '100%' 
+            }}>
+              目前土壤濕度為 {soilMoisture}%{'\n'}確定要強制啟動水泵嗎？
+            </Text>
+            <View style={{ flexDirection:'row', justifyContent:'space-between', width: '100%', marginTop: 8 }}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Button title="取消" color="#888" onPress={() => setConfirmModal({visible:false, pump:null})} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Button title="確認啟動" color="#e67e22" onPress={() => {
+                  if (confirmModal.pump) toggleWaterPump(confirmModal.pump);
+                  setConfirmModal({visible:false, pump:null});
+                }} />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 門檻設定 Modal */}
       <Modal visible={modalVisible} transparent animationType="slide">
@@ -397,12 +615,12 @@ export default function IndexScreen() {
             </Text>
             {editingType === 'temp' && (
               <Text style={{ color: '#888', fontSize: 13, marginBottom: 4 }}>
-                可設定範圍：0 ~ 50°C
+                可設定高於範圍：0 ~ 50°C
               </Text>
             )}
             {editingType !== 'temp' && (
               <Text style={{ color: '#888', fontSize: 13, marginBottom: 4 }}>
-                可設定範圍：0 ~ 100%
+                可設定低於範圍：0 ~ 100%
               </Text>
             )}
             <Slider

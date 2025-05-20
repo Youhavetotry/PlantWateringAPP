@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-export const notificationStyles = StyleSheet.create({
+export const getNotificationStyles = (theme: 'light' | 'dark') => StyleSheet.create({
   bellContainer: {
     position: 'absolute',
     top: 16,
@@ -33,13 +33,14 @@ export const notificationStyles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
+  // 建議於元件中根據 theme 覆蓋 backgroundColor
   notificationDropdown: {
     position: 'absolute',
     top: 48,
     right: 8,
     width: 260,
     maxHeight: 480, // 展示框更長
-    backgroundColor: '#fff',
+    backgroundColor: '#fff', // 預設白色，深色模式時於元件中覆蓋
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -57,12 +58,16 @@ export const notificationStyles = StyleSheet.create({
   notificationTitle: {
     fontWeight: 'bold',
     fontSize: 15,
-    color: '#222',
+    color: theme === 'dark' ? '#e0e0e0' : '#222',
   },
   notificationBody: {
     fontSize: 13,
-    color: '#444',
+    color: theme === 'dark' ? '#cccccc' : '#444',
     marginTop: 2,
+    flexWrap: 'wrap',
+    flexShrink: 1,
+    width: '100%',
+    lineHeight: 18,
   },
   notificationTimestamp: {
     fontSize: 11,
@@ -78,8 +83,9 @@ export const notificationStyles = StyleSheet.create({
     borderRadius: 6,
   },
   markAllText: {
-    color: '#fff',
+    color: '#f0f0f0',
     fontWeight: 'bold',
     fontSize: 13,
   },
 });
+
