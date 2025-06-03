@@ -148,92 +148,64 @@ const IndexScreen = () => {
         AsyncStorage.getItem('selectedPlant')
       ]);
 
-      // 使用從植物選擇頁面傳來的參數，如果沒有的話使用存儲的值
-      const newSoilMoisture = params.soilMoistureThreshold || storedSoilMoisture;
-      const newMinTemperature = params.minTemperatureThreshold || storedMinTemperature;
-      const newHumidity = params.humidityThreshold || storedHumidity;
-
-      if (newSoilMoisture) setSoilMoistureThreshold(parseInt(newSoilMoisture));
-      if (newMinTemperature) setMinTemperatureThreshold(parseInt(newMinTemperature));
-      if (newHumidity) setHumidityThreshold(parseInt(newHumidity));
+      // 先載入 selectedPlant
       if (selectedPlantData) setSelectedPlant(JSON.parse(selectedPlantData));
+
+      // 使用 params > 儲存值 > 預設值
+      setSoilMoistureThreshold(
+        params.soilMoistureThreshold
+          ? parseInt(params.soilMoistureThreshold)
+          : storedSoilMoisture
+            ? parseInt(storedSoilMoisture)
+            : 30
+      );
+      setMinTemperatureThreshold(
+        params.minTemperatureThreshold
+          ? parseInt(params.minTemperatureThreshold)
+          : storedMinTemperature
+            ? parseInt(storedMinTemperature)
+            : 10
+      );
+      setHumidityThreshold(
+        params.humidityThreshold
+          ? parseInt(params.humidityThreshold)
+          : storedHumidity
+            ? parseInt(storedHumidity)
+            : 20
+      );
     } catch (error) {
       console.error('載入設定失敗:', error);
     }
   }, []);
 
-  // 獲取路由參數
+  // APP 啟動時只呼叫一次
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  // 監聽 params 變化
   const params = useLocalSearchParams();
-  
-  // 監聽參數變化並更新設定
   useEffect(() => {
-    const updateSettingsFromParams = async () => {
-      if (params.soilMoistureThreshold || params.minTemperatureThreshold || params.humidityThreshold) {
-        await loadSettings({
-          soilMoistureThreshold: params.soilMoistureThreshold as string,
-          minTemperatureThreshold: params.minTemperatureThreshold as string,
-          humidityThreshold: params.humidityThreshold as string
-        });
-      }
-    };
-    
-    updateSettingsFromParams();
-  }, [params]);
-  
-  // 載入儲存的設定
-  useFocusEffect(
-    useCallback(() => {
-      let isMounted = true;
-      
-      const loadData = async () => {
-        if (isMounted) {
-          await loadSettings();
-        }
-      };
-      
-      loadData();
-      
-      return () => {
-        isMounted = false;
-      };
-    }, [loadSettings])
-  );
+    if (
+      params.soilMoistureThreshold ||
+      params.minTemperatureThreshold ||
+      params.humidityThreshold
+    ) {
+      loadSettings(params);
+    }
+  }, [params, loadSettings]);
 
-
-  // 土壤濕度、溫度與環境濕度門檻：APP 啟動時從 AsyncStorage 讀取
-  useEffect(() => {
-    (async () => {
-      try {
-        const soil = await AsyncStorage.getItem('soilMoistureThreshold');
-        if (soil !== null) {
-          setSoilMoistureThreshold(Number(soil));
-        }
-        const minTemp = await AsyncStorage.getItem('minTemperatureThreshold');
-        if (minTemp !== null) {
-          setMinTemperatureThreshold(Number(minTemp));
-        }
-        const hum = await AsyncStorage.getItem('humidityThreshold');
-        if (hum !== null) {
-          setHumidityThreshold(Number(hum));
-        }
-      } catch (e) {
-        // 讀取失敗時，仍使用預設值
-      }
-    })();
-  }, []);
-
-  // 當 soilMoistureThreshold 變動時寫入 AsyncStorage
+  // 當閾值變動時寫入 AsyncStorage
   useEffect(() => {
     AsyncStorage.setItem('soilMoistureThreshold', soilMoistureThreshold.toString());
   }, [soilMoistureThreshold]);
-  // 當 minTemperatureThreshold 變動時寫入 AsyncStorage
   useEffect(() => {
     AsyncStorage.setItem('minTemperatureThreshold', minTemperatureThreshold.toString());
   }, [minTemperatureThreshold]);
-  // 當 humidityThreshold 變動時寫入 AsyncStorage
   useEffect(() => {
     AsyncStorage.setItem('humidityThreshold', humidityThreshold.toString());
   }, [humidityThreshold]);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [editingType, setEditingType] = useState<'soil' | 'temp' | 'humidity' | null>(null);
   const [tempValue, setTempValue] = useState(0); // 用於 Slider 調整暫存
@@ -496,33 +468,12 @@ const toggleWaterPump = async (pump: 'pump1' | 'pump2') => {
       const elapsedTime = Date.now() - pumpStartTimeRef.current[pump];
       if (typeof currentMoisture === 'number' && currentMoisture >= 45) {
         stopWaterPump(pump, 'auto');
-        Notifications.scheduleNotificationAsync({
-          content: {
-            title: `水泵 ${pump === 'pump1' ? '1' : '2'} 已自動停止`,
-            body: `運行時間：${Math.round(elapsedTime / 1000)} 秒\n原因：土壤濕度達標 (>45%)`,
-          },
-          trigger: null,
-        });
       }
     });
     wateringUnsubscribeRef.current[pump] = unsubscribe;
     const timeout = setTimeout(() => {
       pumpTimeoutTriggeredRef.current[pump] = true;
       stopWaterPump(pump, 'timeout');
-      const now = new Date().toISOString();
-      const title = `水泵 ${pump === 'pump1' ? '1' : '2'} 已自動停止`;
-      const body = `運行時間：30 秒\n原因：超過最大澆水時間`;
-      Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-        },
-        trigger: null,
-      });
-      setNotifications(prev => [
-        { id: `${now}-timeout-${pump}`, title, body, read: false, timestamp: now },
-        ...prev
-      ]);
     }, maxWateringTime);
     wateringTimeoutRef.current[pump] = timeout;
   } catch (error) {
