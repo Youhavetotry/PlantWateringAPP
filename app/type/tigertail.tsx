@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import { useTheme } from '../style/theme-context'; // 引入 useTheme
 import { getDynamicStyles } from "../style/dynamic-style";
 

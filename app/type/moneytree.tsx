@@ -1,14 +1,20 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { useTheme } from '../style/theme-context'; // 引入 useTheme
+import { View, Text, StyleSheet, TextStyle, ViewStyle } from 'react-native';
+import { useTheme } from '../style/theme-context';
 import { getDynamicStyles } from "../style/dynamic-style";
 
+type Styles = {
+  container: ViewStyle;
+  title: TextStyle;
+  subtitle: TextStyle;
+  paramTitle: TextStyle;
+  text: TextStyle;
+};
 
 export default function MoneyTreePage() {
-
   const { theme } = useTheme();
   const styles = useMemo(() => getDynamicStyles(theme), [theme]);
-
+  
   return (
     <View style={styles.container}>
       <Text style={styles.title}>金錢樹 (Zamioculcas zamiifolia)</Text>

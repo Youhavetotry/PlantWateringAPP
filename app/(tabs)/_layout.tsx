@@ -1,35 +1,60 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { View, ActivityIndicator } from "react-native";
 import { Tabs } from "expo-router";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useTheme } from "../style/theme-context"; // 引入 useTheme
-import { SensorDataProvider } from '../context/sensor-data-context';  // 引入 SensorDataProvider
+import { useTheme } from "../style/theme-context";
+import { SensorDataProvider } from '../context/sensor-data-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router, usePathname } from "expo-router";
 
 export default function TabLayout() {
-  
-  const { theme } = useTheme(); // 使用 useTheme 獲取當前主題
+  const { theme } = useTheme();
+  const [isChecking, setIsChecking] = useState(true);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    const checkPlant = async () => {
+      const plantJson = await AsyncStorage.getItem('selectedPlant');
+      // 避免在 category-selection 頁面自己 redirect 自己
+      if (!plantJson && pathname !== '/category-selection') {
+        router.replace('/category-selection');
+      } else {
+        setIsChecking(false);
+      }
+    };
+    checkPlant();
+  }, [pathname]);
+
+  if (isChecking) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
 
   const tabBarStyle = {
-    backgroundColor: theme === "light" ? "#f9f9f9" : "#25292e", // 根據主題設定 tabBar 背景顏色
+    backgroundColor: theme === "light" ? "#f9f9f9" : "#25292e",
   };
 
   const headerStyle = {
-    backgroundColor: theme === "light" ? "#f9f9f9" : "#25292e", // 根據主題設定 header 背景顏色
+    backgroundColor: theme === "light" ? "#f9f9f9" : "#25292e",
   };
 
-  const headerTintColor = theme === "light" ? "#25292e" : "#fff"; // 根據主題設定 header 文字顏色
+  const headerTintColor = theme === "light" ? "#25292e" : "#fff";
 
   return (
     <SensorDataProvider>
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: "#ffd33d", // 設置選中的 tab 顏色
-        headerStyle: headerStyle, // 動態設定 headerStyle
-        headerShadowVisible: false,
-        headerTintColor: headerTintColor, // 動態設定 header 文字顏色
-        tabBarStyle: tabBarStyle, // 動態設定 tabBar 背景顏色
-      }}
-    >
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: "#ffd33d",
+          headerStyle: headerStyle,
+          headerShadowVisible: false,
+          headerTintColor: headerTintColor,
+          tabBarStyle: tabBarStyle,
+        }}
+      >
       <Tabs.Screen
         name="index"
         options={{

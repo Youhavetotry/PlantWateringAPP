@@ -11,6 +11,14 @@ function RootLayoutContent() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="type" options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="plant-selection" 
+          options={{ 
+            title: '選擇植物類型',
+            headerShown: true,
+            headerBackTitle: '返回',
+          }} 
+        />
         <Stack.Screen name="+not-found" />
       </Stack>
       {/* 狀態列樣式和背景顏色 */}

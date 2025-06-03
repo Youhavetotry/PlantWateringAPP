@@ -3,8 +3,8 @@ import { StyleSheet } from 'react-native';
 export const getNotificationStyles = (theme: 'light' | 'dark') => StyleSheet.create({
   bellContainer: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: 10,
+    right: 10,
     zIndex: 99,
   },
   bellButton: {
@@ -33,39 +33,59 @@ export const getNotificationStyles = (theme: 'light' | 'dark') => StyleSheet.cre
     fontSize: 12,
     textAlign: 'center',
   },
-  // 建議於元件中根據 theme 覆蓋 backgroundColor
   notificationDropdown: {
     position: 'absolute',
-    top: 48,
+    top: 50,
     right: 8,
-    width: 260,
-    maxHeight: 480, // 展示框更長
-    backgroundColor: '#fff', // 預設白色，深色模式時於元件中覆蓋
+    width: 320,
+    backgroundColor: theme === 'dark' ? '#23272F' : '#fff',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme === 'dark' ? '#444' : '#e0e0e0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-    padding: 10,
+    shadowRadius: 10,
+    elevation: 8,
     zIndex: 200,
+    maxHeight: 400,
+  },
+  dropdownHeader: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme === 'dark' ? '#333' : '#eee',
+  },
+  notificationsContainer: {
+    maxHeight: 350,
+  },
+  scrollContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  scrollViewContent: {
+    paddingBottom: 16,
+  },
+  emptyNotificationText: {
+    color: theme === 'dark' ? '#888' : '#666',
+    textAlign: 'center',
+    paddingVertical: 20,
   },
   notificationItem: {
-    paddingVertical: 10,
-    borderBottomColor: '#eee',
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+    borderBottomColor: theme === 'dark' ? '#333' : '#eee',
     borderBottomWidth: 1,
   },
   notificationTitle: {
     fontWeight: 'bold',
-    fontSize: 15,
     color: theme === 'dark' ? '#e0e0e0' : '#222',
+    flexWrap: 'wrap',
+    width: '100%',
   },
   notificationBody: {
-    fontSize: 13,
     color: theme === 'dark' ? '#cccccc' : '#444',
-    marginTop: 2,
+    marginTop: 4,
     flexWrap: 'wrap',
-    flexShrink: 1,
     width: '100%',
     lineHeight: 18,
   },
@@ -84,6 +104,18 @@ export const getNotificationStyles = (theme: 'light' | 'dark') => StyleSheet.cre
   },
   markAllText: {
     color: '#f0f0f0',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  clearAllButton: {
+    marginLeft: 8,
+    padding: 6,
+    backgroundColor: '#d32f2f',
+    borderRadius: 6,
+    alignSelf: 'flex-end',
+  },
+  clearAllText: {
+    color: '#fff',
     fontWeight: 'bold',
     fontSize: 13,
   },

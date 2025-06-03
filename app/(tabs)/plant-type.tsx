@@ -46,6 +46,7 @@ export default function PlantType() {
 
   return (
     <View style={styles.container}>
+      {/* @ts-ignore */}
       <Text style={styles.title}>選擇植物種類</Text>
       <FlatList
         data={plantData}

@@ -36,20 +36,6 @@ type DynamicStyles = {
   plantSubtitle: TextStyle;
   paramTitle: TextStyle;
   plantText: TextStyle;
-  
-  // Plant info card
-  noPlantContainer: ViewStyle;
-  noPlantText: TextStyle;
-  selectPlantButton: ViewStyle;
-  selectPlantButtonText: TextStyle;
-  plantInfoContainer: ViewStyle;
-  plantImageContainer: ViewStyle;
-  plantImage: ViewStyle;
-  plantIcon: TextStyle;
-  plantDetails: ViewStyle;
-  plantName: TextStyle;
-  plantDescription: TextStyle;
-  changePlantButton: ViewStyle;
 };
 
 // Generate dynamic styles based on theme
@@ -65,7 +51,6 @@ export const getDynamicStyles = (theme: Theme): DynamicStyles => {
       flex: 1,
       backgroundColor,
       padding: 20,
-      paddingTop: 60, // Add padding to prevent overlap with notification bell
     },
     
     // Text
@@ -98,17 +83,9 @@ export const getDynamicStyles = (theme: Theme): DynamicStyles => {
     // Button
     button: {
       backgroundColor: theme === 'light' ? '#2196F3' : '#006994',
-      width: 140, // Fixed width
-      height: 48, // Fixed height
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderRadius: 24,
+      padding: 10,
+      borderRadius: 5,
       color: '#fff',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
     },
     
     // Chart styles
@@ -153,26 +130,17 @@ export const getDynamicStyles = (theme: Theme): DynamicStyles => {
     buttonContainer: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginTop: 0, // Increase top margin to ensure space below notification bell
-      marginBottom: 30,
+      marginTop: 20,
+      marginBottom: 20,
       paddingHorizontal: 16,
-      position: 'relative',
-      zIndex: 1, // Ensure buttons stay above other content
     },
     
     // Active button
     activeButton: {
-      backgroundColor: '#ff3b30', // Red color for active state
-      width: 140, // Fixed width
-      height: 48, // Fixed height
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderRadius: 24,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 3,
-      elevation: 3,
+      backgroundColor: theme === 'light' ? '#2196F3' : '#006994',
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 20,
     },
     
     // Button text
@@ -199,11 +167,11 @@ export const getDynamicStyles = (theme: Theme): DynamicStyles => {
     
     // Plant page specific styles
     plantContainer: {
-      marginBottom: 20,
-      padding: 15,
-      borderRadius: 12,
-      backgroundColor: theme === 'dark' ? '#2c2c2e' : '#f8f8f8',
+      flex: 1,
+      backgroundColor: theme === 'dark' ? '#23272F' : '#f4f6fa',
+      padding: 16,
     },
+    
     plantTitle: {
       color: textColor,
       fontSize: 24,
@@ -212,6 +180,7 @@ export const getDynamicStyles = (theme: Theme): DynamicStyles => {
       marginBottom: 20,
       textAlign: 'center',
     },
+    
     plantSubtitle: {
       color: textColor,
       fontSize: 20,
@@ -219,85 +188,19 @@ export const getDynamicStyles = (theme: Theme): DynamicStyles => {
       marginBottom: 20,
       textAlign: 'left',
     },
+    
     paramTitle: {
       fontSize: 18,
       fontWeight: 'bold',
       color: textColor,
       marginTop: 20,
     },
+    
     plantText: {
       color: textColor,
       fontSize: 16,
       marginTop: 10,
       lineHeight: 24,
-    },
-    
-    // Plant info card
-    noPlantContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: 16,
-      backgroundColor: theme === 'dark' ? '#2c2c2e' : '#f8f8f8',
-      borderRadius: 12,
-      marginBottom: 16,
-    },
-    noPlantText: {
-      fontSize: 16,
-      color: theme === 'dark' ? '#e0e0e0' : '#25292e',
-    },
-    selectPlantButton: {
-      backgroundColor: '#4CAF50',
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: 8,
-    },
-    selectPlantButtonText: {
-      color: 'white',
-      fontWeight: '600',
-    },
-    plantInfoContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 16,
-      backgroundColor: theme === 'dark' ? '#2c2c2e' : '#f8f8f8',
-      borderRadius: 12,
-      marginBottom: 16,
-    },
-    plantImageContainer: {
-      width: 64,
-      height: 64,
-      borderRadius: 12,
-      backgroundColor: theme === 'dark' ? '#3a3a3c' : '#f0f0f0',
-      justifyContent: 'center',
-      alignItems: 'center',
-      overflow: 'hidden',
-      marginRight: 16,
-    },
-    plantImage: {
-      width: '100%',
-      height: '100%',
-    },
-    plantIcon: {
-      fontSize: 32,
-      color: theme === 'dark' ? '#e0e0e0' : '#25292e',
-    },
-    plantDetails: {
-      flex: 1,
-      marginRight: 12,
-    },
-    plantName: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: theme === 'dark' ? '#fff' : '#25292e',
-      marginBottom: 4,
-    },
-    plantDescription: {
-      fontSize: 14,
-      color: theme === 'dark' ? '#aaa' : '#666',
-    },
-    changePlantButton: {
-      padding: 8,
     },
     
     // Content container
