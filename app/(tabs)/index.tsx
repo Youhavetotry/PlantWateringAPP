@@ -1,21 +1,6 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
-  Modal, 
-  TextInput, 
-  Button, 
-  Switch, 
-  ViewStyle, 
-  Animated, 
-  ActivityIndicator,
-  FlatList,
-  ListRenderItem 
-} from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Modal, Button, Animated, ActivityIndicator,} from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { PlantType } from '../constants/plantTypes';
 import { useNavigation } from '@react-navigation/native';
@@ -105,13 +90,27 @@ type RootStackParamList = {
 };
 
 const IndexScreen = () => {
+    //useEffect(() => {
+    //(async () => {
+      //const deviceId = await AsyncStorage.getItem('deviceId');
+      //if (!deviceId) {
+        //router.replace('/device_select');
+              //}
+    //})();
+  //}, []);
+
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('deviceId').then(setDeviceId);
+  }, []);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   // --- 水泵控制相關 state/ref 統一宣告 ---
   const [isWatering, setIsWatering] = useState<{ [key in 'pump1' | 'pump2']: boolean }>({ pump1: false, pump2: false });
   const pumpStartTimeRef = useRef<{ [key in 'pump1' | 'pump2']: number }>({ pump1: 0, pump2: 0 });
   const pumpTimeoutTriggeredRef = useRef<{ [key in 'pump1' | 'pump2']: boolean }>({ pump1: false, pump2: false });
-  const wateringTimeoutRef = useRef<{ [key in 'pump1' | 'pump2']: NodeJS.Timeout | null }>({ pump1: null, pump2: null });
+  const wateringTimeoutRef = useRef<{ [key in 'pump1' | 'pump2']: NodeJS.Timeout | number | null }>({ pump1: null, pump2: null });
   const wateringUnsubscribeRef = useRef<{ [key in 'pump1' | 'pump2']: (() => void) | null }>({ pump1: null, pump2: null });
   const soilMoistureRef = ref(database, 'sensorData/latest');
   const [confirmModal, setConfirmModal] = useState<{
@@ -731,7 +730,7 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 32 }}>
         <View style={styles.sensorDataContainer}>
           {/* 土壤濕度區塊 */}
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => { setEditingType('soil'); setTempValue(soilMoistureThreshold); setModalVisible(true); }}>
             <Text style={{ ...styles.title, fontWeight: 'bold' as 'bold', textAlign: 'center' as 'center' }}>土壤濕度: {soilMoisture}%</Text>
             <AnimatedProgressBar progress={validSoilMoisture} color="#1abc9c" />
           </TouchableOpacity>
