@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text } from 'react-native';
+import { ScrollView, Text, Image, SafeAreaView } from 'react-native';
 import { useTheme } from '../style/theme-context'; // 引入 useTheme
 import { getDynamicStyles } from "../style/dynamic-style";
 
@@ -7,10 +7,12 @@ import { getDynamicStyles } from "../style/dynamic-style";
 export default function TigerTailPage() {
 
   const { theme } = useTheme();
-  const styles = useMemo(() => getDynamicStyles(theme), [theme]);
-
+  const styles = useMemo(() => getDynamicStyles(theme), [theme]); // 注意：<ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, alignItems: 'flex-start' }}>
+  
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={{ padding: 24, alignItems: 'flex-start', paddingBottom: 48 }}>
+      <Image source={require('../../assets/images/plant/tigertail.png')} style={{ width: 120, height: 120, borderRadius: 12, alignSelf: 'center', marginBottom: 18 }} />
       <Text style={styles.title}>虎尾蘭 (Sansevieria trifasciata)</Text>
       <Text style={styles.subtitle}>生長條件</Text>
       
@@ -22,6 +24,7 @@ export default function TigerTailPage() {
       
       <Text style={styles.paramTitle}>★ 環境濕度</Text>
       <Text style={styles.text}>​虎尾蘭適應各種濕度範圍，無需過高的空氣濕度。它能夠在普通的家庭環境中生長，理想的環境濕度範圍為30% 到 50%，過高或過低的濕度會影響植物的生長，導致葉片發黃或縮小</Text>
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

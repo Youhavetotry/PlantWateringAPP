@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext, useMemo, useRef } from "react";
-import { View, Button, Switch, Text, Image, ActivityIndicator, StyleSheet, TouchableOpacity, Animated } from "react-native";
+import { View, Button, Switch, Text, Image, ActivityIndicator, StyleSheet, TouchableOpacity, Animated, ScrollView } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDatabase, ref, update, onValue } from "firebase/database";
 import { useTheme } from "../style/theme-context";
@@ -75,12 +76,18 @@ export default function CameraControl() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 48 }}>
+
       <Text style={styles.text}>最新圖片:</Text>
       {loading ? (
         <ActivityIndicator size="large"/>
       ) : (
-        <Image source={{ uri: imageUrl || '' }} style={{ width: 370, height: 280, marginBottom: 20, alignSelf: 'center' }} />
+        <Image
+          source={{ uri: imageUrl || '' }}
+          style={{ width: '100%', aspectRatio: 4/3, marginBottom: 20, alignSelf: 'center' }}
+          resizeMode="contain"
+        />
       )}
       <View style={{ flexDirection: "row", alignItems: "center", marginVertical: 10 }}>
         <Text style={styles.text}>定時模式</Text>
@@ -112,6 +119,7 @@ export default function CameraControl() {
           </Text>
         </Animated.View>
       )}
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../style/theme-context';
 import { getDynamicStyles } from "../style/dynamic-style";
 import SettingCaptureInterval from '../setting-capture-interval';
@@ -94,7 +95,9 @@ export default function SettingsPage() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: bgColor, flex: 1, padding: 16 }]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 16 }}>
+
       <Stack.Screen options={{ title: '設定' }} />
       
       <View style={{ marginBottom: 24 }}>
@@ -122,6 +125,7 @@ export default function SettingsPage() {
           <SettingCaptureInterval />
         </View>
       </View>
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

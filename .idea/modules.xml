@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/PlantWatering.iml" filepath="$PROJECT_DIR$/.idea/PlantWatering.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/PlantWateringAPP.iml" filepath="$PROJECT_DIR$/.idea/PlantWateringAPP.iml" />
     </modules>
   </component>
 </project>

@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, TouchableOpacity, ScrollView, Modal, Button, Animated, ActivityIndicator,} from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Modal, Button, Animated, ActivityIndicator, Switch } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { PlantType } from '../constants/plantTypes';
 import { useNavigation } from '@react-navigation/native';
@@ -108,6 +108,9 @@ const IndexScreen = () => {
 
   // --- 水泵控制相關 state/ref 統一宣告 ---
   const [isWatering, setIsWatering] = useState<{ [key in 'pump1' | 'pump2']: boolean }>({ pump1: false, pump2: false });
+  const [waterPump1Status, setWaterPump1Status] = useState<'ON' | 'OFF'>('OFF');
+  const [waterPump2Status, setWaterPump2Status] = useState<'ON' | 'OFF'>('OFF');
+  const [smartMode, setSmartMode] = useState(false);
   const pumpStartTimeRef = useRef<{ [key in 'pump1' | 'pump2']: number }>({ pump1: 0, pump2: 0 });
   const pumpTimeoutTriggeredRef = useRef<{ [key in 'pump1' | 'pump2']: boolean }>({ pump1: false, pump2: false });
   const wateringTimeoutRef = useRef<{ [key in 'pump1' | 'pump2']: NodeJS.Timeout | number | null }>({ pump1: null, pump2: null });
@@ -228,6 +231,13 @@ const IndexScreen = () => {
   const humidity = sensorData?.humidity ?? 0;
   const timestamp = sensorData?.timestamp ?? new Date().toISOString();
 
+  // --- 智慧模式自動開啟水泵 ---
+  useEffect(() => {
+    if (smartMode && soilMoisture < soilMoistureThreshold && waterPump1Status !== 'ON' && !isWatering.pump1) {
+      updatePumpStatus('pump1', 'ON');
+    }
+  }, [smartMode, soilMoisture, soilMoistureThreshold, waterPump1Status, isWatering.pump1]);
+
   // 請求通知權限（建議只做一次）
   useEffect(() => {
     Notifications.requestPermissionsAsync();
@@ -340,8 +350,6 @@ const IndexScreen = () => {
   const validHumidity = Math.round((humidity / 100) * 100) / 100;
 
   // 兩個水泵的狀態 (僅顯示狀態的文字，不作 toggle 而是上傳命令)
-  const [waterPump1Status, setWaterPump1Status] = useState<'ON' | 'OFF'>('OFF');
-  const [waterPump2Status, setWaterPump2Status] = useState<'ON' | 'OFF'>('OFF');
   const [loading, setLoading] = useState<{ pump1: boolean; pump2: boolean }>({ pump1: false, pump2: false });
   const [cooldown, setCooldown] = useState<{ pump1: boolean; pump2: boolean }>({ pump1: false, pump2: false });
 
@@ -462,7 +470,7 @@ const toggleWaterPump = async (pump: 'pump1' | 'pump2') => {
   try {
     await updatePumpStatus(pump, "ON");
     setIsWatering(prev => ({ ...prev, [pump]: true }));
-    const maxWateringTime = 30000;
+    const maxWateringTime = 10000;
     const unsubscribe = onValue(soilMoistureRef, (snapshot) => {
       const currentMoisture = snapshot.val()?.moisture;
       const elapsedTime = Date.now() - pumpStartTimeRef.current[pump];
@@ -504,11 +512,33 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
 };
 
   // --- 最大澆水時間（秒） ---
-  const maxWateringTime = 30; // 30秒
+  const maxWateringTime = 10; // 10秒
 
-
+  // --- 智慧澆水模式 state ---
+  
   // --- 禁用按鈕條件 ---
-  const isButtonDisabled = soilMoisture > 70;
+  const isButtonDisabled = soilMoisture > 70 || smartMode;
+
+  // --- 監聽/同步 Smart Mode 狀態 ---
+  useEffect(() => {
+    // 讀取本地與 Firebase 狀態
+    const loadMode = async () => {
+      const local = await AsyncStorage.getItem('smartMode');
+      if (local !== null) setSmartMode(local === 'true');
+      // 監聽 Firebase
+      const modeRef = ref(database, 'mode');
+      onValue(modeRef, (snapshot) => {
+        if (snapshot.exists()) setSmartMode(snapshot.val() === 'smart');
+      });
+    };
+    loadMode();
+  }, []);
+
+  const handleSmartModeToggle = async (value: boolean) => {
+    setSmartMode(value);
+    await AsyncStorage.setItem('smartMode', value ? 'true' : 'false');
+    await set(ref(database, 'mode'), value ? 'smart' : 'manual');
+  };
 
   // --- 未讀通知數 ---
   const unreadCount = notifications.filter((n: Notification) => !n.read).length;
@@ -614,6 +644,33 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
             <Text style={styles.buttonText}>水泵 2 ({waterPump2Status})</Text>
           )}
         </TouchableOpacity>
+      </View>
+
+      {/* 智慧澆水模式 Switch */}
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginVertical: 10,
+        backgroundColor: theme === 'dark' ? '#23272F' : '#f4f6fa',
+        borderRadius: 12,
+        padding: 8,
+      }}>
+        <Text style={{
+          marginRight: 8,
+          fontSize: 16,
+          color: theme === 'dark' ? '#e0e0e0' : '#25292e',
+          fontWeight: 'bold',
+        }}>
+          智慧澆水模式
+        </Text>
+        <Switch
+          value={smartMode}
+          onValueChange={handleSmartModeToggle}
+          trackColor={{ false: theme === 'dark' ? '#444' : '#767577', true: '#1abc9c' }}
+          thumbColor={smartMode ? (theme === 'dark' ? '#fff' : '#fff') : (theme === 'dark' ? '#333' : '#f4f3f4')}
+          ios_backgroundColor={theme === 'dark' ? '#444' : '#ccc'}
+        />
       </View>
 
       {/* 通知鈴鐺按鈕（右上角） */}

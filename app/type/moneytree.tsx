@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TextStyle, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, TextStyle, ViewStyle, ScrollView, Image } from 'react-native';
 import { useTheme } from '../style/theme-context';
 import { getDynamicStyles } from "../style/dynamic-style";
 
@@ -13,10 +13,12 @@ type Styles = {
 
 export default function MoneyTreePage() {
   const { theme } = useTheme();
-  const styles = useMemo(() => getDynamicStyles(theme), [theme]);
+  const styles = useMemo(() => getDynamicStyles(theme), [theme]); 
   
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={{ padding: 24, alignItems: 'flex-start', paddingBottom: 48 }}>
+      <Image source={require('../../assets/images/plant/moneytree.png')} style={{ width: 120, height: 120, borderRadius: 12, alignSelf: 'center', marginBottom: 18 }} />
       <Text style={styles.title}>金錢樹 (Zamioculcas zamiifolia)</Text>
       <Text style={styles.subtitle}>生長條件</Text>
       
@@ -28,7 +30,8 @@ export default function MoneyTreePage() {
       
       <Text style={styles.paramTitle}>★ 環境濕度</Text>
       <Text style={styles.text}>金錢樹適應不同濕度的環境，無需特別濕潤的空氣，普通家庭環境即可。最佳環境濕度為40% 到 60% 。</Text>
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

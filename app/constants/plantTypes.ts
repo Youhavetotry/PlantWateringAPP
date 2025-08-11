@@ -145,7 +145,7 @@ export const plantTypes: PlantType[] = [
     }
   },
   {
-    id: 'money-tree',
+    id: 'moneytree',
     name: '金錢樹',
     description: '象徵財富，耐旱性強',
     icon: '🌿',
