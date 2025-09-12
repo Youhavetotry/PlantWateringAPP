@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TextStyle, ViewStyle, ScrollView, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../style/theme-context';
 import { getDynamicStyles } from "../style/dynamic-style";
 
@@ -34,4 +35,3 @@ export default function MoneyTreePage() {
     </SafeAreaView>
   );
 }
-

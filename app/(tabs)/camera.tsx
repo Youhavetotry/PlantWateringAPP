@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDatabase, ref, update, onValue } from "firebase/database";
 import { useTheme } from "../style/theme-context";
 import { getDynamicStyles } from "../style/dynamic-style";
+import { useEventLog } from '../context/event-log-context';
 
 export default function CameraControl() {
   const { theme } = useTheme();
@@ -13,7 +14,10 @@ export default function CameraControl() {
   const [showToast, setShowToast] = useState(false);
   const toastOpacity = useRef(new Animated.Value(0)).current; // for toast animation
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  // 僅在手動拍照後的下一張圖片到達時記錄日誌
+  const manualPhotoRequestedRef = useRef(false);
   const [loading, setLoading] = useState(true);
+  const { logEvent } = useEventLog();
 
   const styles = useMemo(() => getDynamicStyles(theme), [theme]);
 
@@ -31,6 +35,16 @@ export default function CameraControl() {
       if (data && data.url) {
         setImageUrl(data.url);
         setLoading(false);
+        // 只有在手動拍照請求後，才記錄「已接收最新相片」，避免每次打開頁面都記錄
+        if (manualPhotoRequestedRef.current) {
+          logEvent({
+            source: 'system',
+            category: 'camera',
+            action: 'photo_received',
+            message: '已接收最新相片'
+          });
+          manualPhotoRequestedRef.current = false;
+        }
       }
     });
 
@@ -38,7 +52,22 @@ export default function CameraControl() {
 
   // 觸發手動拍照
   const takePhoto = async () => {
-    await update(ref(db, "photo"), { request: true });
+    try {
+      await update(ref(db, "photo"), { request: true });
+      // 標記為使用者剛觸發了手動拍照，等待下一張圖片到達再記錄
+      manualPhotoRequestedRef.current = true;
+      logEvent({
+        source: 'user',
+        category: 'camera',
+        action: 'photo_taken_manual',
+        message: '你執行了手動拍照'
+      });
+    } catch (e) {
+      logEvent({
+        source: 'system', category: 'error', action: 'firebase_update_error',
+        message: '觸發手動拍照失敗', meta: { where: 'camera.takePhoto.update(photo.request)', error: String(e) }
+      });
+    }
   };
 
   // 切換模式 (手動 / 定時)
@@ -51,13 +80,30 @@ export default function CameraControl() {
       if (!interval || interval < 1 || interval > 24) interval = 1;
     } catch (e) {
       interval = 1;
+      logEvent({ source: 'system', category: 'error', action: 'async_storage_error', message: '讀取拍照間隔失敗', meta: { where: 'camera.toggleMode.get(captureIntervalHours)', error: String(e) } });
     }
     const nextCapture = isScheduled ? 0 : Math.floor(Date.now() / 1000) + interval * 3600;
-    await update(ref(db, "photo"), { mode: newMode, nextCapture });
+    try {
+      await update(ref(db, "photo"), { mode: newMode, nextCapture });
+    } catch (e) {
+      logEvent({ source: 'system', category: 'error', action: 'firebase_update_error', message: '更新拍照模式失敗', meta: { where: 'camera.toggleMode.update(photo)', error: String(e), mode: newMode, nextCapture } });
+    }
     setIsScheduled(!isScheduled);
     // 寫入 AsyncStorage
-    await AsyncStorage.setItem('photoMode', newMode);
-    await AsyncStorage.setItem('nextCapture', nextCapture.toString());
+    try {
+      await AsyncStorage.setItem('photoMode', newMode);
+      await AsyncStorage.setItem('nextCapture', nextCapture.toString());
+    } catch (e) {
+      logEvent({ source: 'system', category: 'error', action: 'async_storage_error', message: '寫入拍照模式或下一次時間失敗', meta: { where: 'camera.toggleMode.set(photoMode/nextCapture)', error: String(e), mode: newMode, nextCapture } });
+    }
+    // 記錄模式切換
+    logEvent({
+      source: 'user',
+      category: 'camera',
+      action: newMode === 'scheduled' ? 'photo_scheduled_enabled' : 'photo_scheduled_disabled',
+      message: newMode === 'scheduled' ? '開啟定時拍照模式' : '關閉定時拍照模式',
+      meta: newMode === 'scheduled' ? { intervalHour: interval, nextCapture } : undefined,
+    });
     // 顯示提示
     setShowToast(true);
     Animated.timing(toastOpacity, {

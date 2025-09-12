@@ -1,11 +1,11 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, TouchableOpacity, ScrollView, Modal, Button, Animated, ActivityIndicator, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Modal, Button, Animated, ActivityIndicator, Switch, Platform } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { PlantType } from '../constants/plantTypes';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Slider from '@react-native-community/slider';
+import { Slider } from '@miblanchard/react-native-slider';
 import * as Notifications from 'expo-notifications';
 import { useTheme } from '../style/theme-context';
 import { getDynamicStyles } from "../style/dynamic-style";
@@ -15,6 +15,7 @@ import { useSensorData } from '../context/sensor-data-context';
 import { database } from "../configs/firebase-config";
 import { ref, set, onValue, update } from "firebase/database";
 import { Image, ImageStyle } from 'react-native';
+import { useEventLog } from '../context/event-log-context';
 
 // 帶動畫的自定義進度條元件
 const AnimatedProgressBar = ({ progress, color }: { progress: number; color: string }) => {
@@ -121,6 +122,24 @@ const IndexScreen = () => {
     pump: 'pump1' | 'pump2' | null,
     message?: string
   }>({visible: false, pump: null, message: ''});
+
+  // 統一的最大澆水時間（毫秒），可由 AsyncStorage 覆寫，預設 10 秒
+  const [maxWateringTimeMs, setMaxWateringTimeMs] = useState<number>(10000);
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem('maxWateringTimeMs');
+        if (stored) {
+          const n = parseInt(stored, 10);
+          if (!isNaN(n) && n > 0 && n <= 5 * 60 * 1000) {
+            setMaxWateringTimeMs(n);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load maxWateringTimeMs:', e);
+      }
+    })();
+  }, []);
 
   // --- 門檻設定 state ---
   const [selectedPlant, setSelectedPlant] = useState<PlantType | null>(null);
@@ -234,13 +253,21 @@ const IndexScreen = () => {
   // --- 智慧模式自動開啟水泵 ---
   useEffect(() => {
     if (smartMode && soilMoisture < soilMoistureThreshold && waterPump1Status !== 'ON' && !isWatering.pump1) {
+      // 記錄智慧模式自動開啟
+      logEvent({
+        source: 'system',
+        category: 'smart_watering',
+        action: 'smart_auto_on',
+        message: '智慧澆水自動開啟水泵 1',
+        meta: { soilMoisture, soilMoistureThreshold }
+      });
       updatePumpStatus('pump1', 'ON');
     }
   }, [smartMode, soilMoisture, soilMoistureThreshold, waterPump1Status, isWatering.pump1]);
 
-  // 請求通知權限（建議只做一次）
+  // 通知權限初始化已集中於 app/_layout.tsx 中
   useEffect(() => {
-    Notifications.requestPermissionsAsync();
+    // no-op
   }, []);
 
   // --- 自動檢查門檻並發送通知 ---
@@ -255,10 +282,14 @@ const IndexScreen = () => {
     if (soilMoisture <= soilMoistureThreshold && !notificationCooldown.current.soil) {
       const title = '植物提醒';
       const body = `土壤濕度過低（≤${soilMoistureThreshold}%），請記得澆水！`;
-      Notifications.scheduleNotificationAsync({
-        content: { title, body },
-        trigger: null,
-      });
+      if (Platform.OS !== 'web') {
+        Notifications.scheduleNotificationAsync({
+          content: { title, body },
+          trigger: null,
+        })
+        .then(() => logEvent({ source: 'system', category: 'notification', action: 'notification_sent', message: title, meta: { body } }))
+        .catch((e) => logEvent({ source: 'system', category: 'notification', action: 'notification_failed', message: `${title} 發送失敗`, meta: { body, error: String(e) } }));
+      }
       setNotifications(prev => [
         { id: `${now}-soil`, title, body, read: false, timestamp: now },
         ...prev
@@ -271,10 +302,14 @@ const IndexScreen = () => {
     if (temperature < minTemperatureThreshold && !notificationCooldown.current.tempLow) {
       const title = '植物提醒';
       const body = `溫度過低（<${minTemperatureThreshold}°C），請注意保溫！`;
-      Notifications.scheduleNotificationAsync({
-        content: { title, body },
-        trigger: null,
-      });
+      if (Platform.OS !== 'web') {
+        Notifications.scheduleNotificationAsync({
+          content: { title, body },
+          trigger: null,
+        })
+        .then(() => logEvent({ source: 'system', category: 'notification', action: 'notification_sent', message: title, meta: { body } }))
+        .catch((e) => logEvent({ source: 'system', category: 'notification', action: 'notification_failed', message: `${title} 發送失敗`, meta: { body, error: String(e) } }));
+      }
       setNotifications(prev => [
         { id: `${now}-temp-low`, title, body, read: false, timestamp: now },
         ...prev
@@ -287,10 +322,14 @@ const IndexScreen = () => {
     if (temperature > GLOBAL_MAX_TEMPERATURE && !notificationCooldown.current.tempHigh) {
       const title = '植物提醒';
       const body = `溫度過高（>${GLOBAL_MAX_TEMPERATURE}°C），請注意降溫！`;
-      Notifications.scheduleNotificationAsync({
-        content: { title, body },
-        trigger: null,
-      });
+      if (Platform.OS !== 'web') {
+        Notifications.scheduleNotificationAsync({
+          content: { title, body },
+          trigger: null,
+        })
+        .then(() => logEvent({ source: 'system', category: 'notification', action: 'notification_sent', message: title, meta: { body } }))
+        .catch((e) => logEvent({ source: 'system', category: 'notification', action: 'notification_failed', message: `${title} 發送失敗`, meta: { body, error: String(e) } }));
+      }
       setNotifications(prev => [
         { id: `${now}-temp-high`, title, body, read: false, timestamp: now },
         ...prev
@@ -302,10 +341,14 @@ const IndexScreen = () => {
     if (humidity <= humidityThreshold && !notificationCooldown.current.humidity) {
       const title = '植物提醒';
       const body = `環境濕度過低（≤${humidityThreshold}%），請注意加濕！`;
-      Notifications.scheduleNotificationAsync({
-        content: { title, body },
-        trigger: null,
-      });
+      if (Platform.OS !== 'web') {
+        Notifications.scheduleNotificationAsync({
+          content: { title, body },
+          trigger: null,
+        })
+        .then(() => logEvent({ source: 'system', category: 'notification', action: 'notification_sent', message: title, meta: { body } }))
+        .catch((e) => logEvent({ source: 'system', category: 'notification', action: 'notification_failed', message: `${title} 發送失敗`, meta: { body, error: String(e) } }));
+      }
       setNotifications(prev => [
         { id: `${now}-humidity`, title, body, read: false, timestamp: now },
         ...prev
@@ -338,6 +381,13 @@ const IndexScreen = () => {
         }
       } catch (error) {
         console.error('讀取選擇的植物失敗:', error);
+        logEvent({
+          source: 'system',
+          category: 'error',
+          action: 'async_storage_error',
+          message: '讀取已選植物失敗',
+          meta: { where: 'tabs/index.loadSelectedPlant', error: String(error) }
+        });
       }
     };
     
@@ -435,13 +485,30 @@ const stopWaterPump = (pump: 'pump1' | 'pump2', reason: 'manual' | 'auto' | 'tim
   
   if (reason === 'manual') {
     title = `水泵 ${pump === 'pump1' ? '1' : '2'} 已手動停止`;
-    body = `運行時間：${elapsedTime} 秒\n原因：使用者手動停止`;
+    body = `運行時間：${elapsedTime} 秒\n原因：你手動停止`;
+    // manual 停止的使用者事件已在觸發端記錄
   } else if (reason === 'timeout') {
     title = `水泵 ${pump === 'pump1' ? '1' : '2'} 已自動停止`;
     body = `運行時間：${elapsedTime} 秒\n原因：超過最大澆水時間`;
+    // 系統事件：超時自動關閉
+    logEvent({
+      source: 'system',
+      category: 'pump',
+      action: 'auto_off_timeout',
+      message: `超過安全時限，自動關閉水泵 ${pump === 'pump1' ? '1' : '2'}`,
+      meta: { durationSec: elapsedTime }
+    });
   } else {
     title = `水泵 ${pump === 'pump1' ? '1' : '2'} 已自動停止`;
     body = `運行時間：${elapsedTime} 秒\n原因：土壤濕度已達標`;
+    // 系統事件：智慧自動關閉（達標）
+    logEvent({
+      source: 'system',
+      category: 'pump',
+      action: 'auto_off_moisture_reached',
+      message: `土壤濕度達標，自動關閉水泵 ${pump === 'pump1' ? '1' : '2'}`,
+      meta: { durationSec: elapsedTime }
+    });
   }
   
   // 添加通知到通知列表
@@ -451,10 +518,14 @@ const stopWaterPump = (pump: 'pump1' | 'pump2', reason: 'manual' | 'auto' | 'tim
   ]);
   
   // 發送系統通知
-  Notifications.scheduleNotificationAsync({
-    content: { title, body },
-    trigger: null,
-  });
+  if (Platform.OS !== 'web') {
+    Notifications.scheduleNotificationAsync({
+      content: { title, body },
+      trigger: null,
+    })
+    .then(() => logEvent({ source: 'system', category: 'notification', action: 'notification_sent', message: title, meta: { body } }))
+    .catch((e) => logEvent({ source: 'system', category: 'notification', action: 'notification_failed', message: `${title} 發送失敗`, meta: { body, error: String(e) } }));
+  }
 };
 
 // --- 啟動/切換水泵 ---
@@ -462,7 +533,14 @@ const toggleWaterPump = async (pump: 'pump1' | 'pump2') => {
   updateWateringStats();
   if (cooldown[pump]) return;
   if (isWatering[pump]) {
-    stopWaterPump(pump); // 手動強制停止
+    // 手動強制停止
+    logEvent({
+      source: 'user',
+      category: 'pump',
+      action: 'pump_off',
+      message: `你手動關閉了水泵 ${pump === 'pump1' ? '1' : '2'}`,
+    });
+    stopWaterPump(pump);
     return;
   }
   pumpStartTimeRef.current[pump] = Date.now();
@@ -470,7 +548,12 @@ const toggleWaterPump = async (pump: 'pump1' | 'pump2') => {
   try {
     await updatePumpStatus(pump, "ON");
     setIsWatering(prev => ({ ...prev, [pump]: true }));
-    const maxWateringTime = 10000;
+    logEvent({
+      source: 'user',
+      category: 'pump',
+      action: 'pump_on',
+      message: `你手動打開了水泵 ${pump === 'pump1' ? '1' : '2'}`,
+    });
     const unsubscribe = onValue(soilMoistureRef, (snapshot) => {
       const currentMoisture = snapshot.val()?.moisture;
       const elapsedTime = Date.now() - pumpStartTimeRef.current[pump];
@@ -482,7 +565,7 @@ const toggleWaterPump = async (pump: 'pump1' | 'pump2') => {
     const timeout = setTimeout(() => {
       pumpTimeoutTriggeredRef.current[pump] = true;
       stopWaterPump(pump, 'timeout');
-    }, maxWateringTime);
+    }, maxWateringTimeMs);
     wateringTimeoutRef.current[pump] = timeout;
   } catch (error) {
     setIsWatering(prev => ({ ...prev, [pump]: false }));
@@ -492,6 +575,13 @@ const toggleWaterPump = async (pump: 'pump1' | 'pump2') => {
 // --- 處理水泵按鈕點擊 ---
 const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
   if (isWatering[pump]) {
+    // 手動關閉
+    logEvent({
+      source: 'user',
+      category: 'pump',
+      action: 'pump_off',
+      message: `你手動關閉了水泵 ${pump === 'pump1' ? '1' : '2'}`,
+    });
     stopWaterPump(pump);
     return;
   }
@@ -511,8 +601,7 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
   }
 };
 
-  // --- 最大澆水時間（秒） ---
-  const maxWateringTime = 10; // 10秒
+  const { logs, logEvent, clearLogs } = useEventLog();
 
   // --- 智慧澆水模式 state ---
   
@@ -538,6 +627,12 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
     setSmartMode(value);
     await AsyncStorage.setItem('smartMode', value ? 'true' : 'false');
     await set(ref(database, 'mode'), value ? 'smart' : 'manual');
+    logEvent({
+      source: 'user',
+      category: 'smart_watering',
+      action: value ? 'smart_mode_enabled' : 'smart_mode_disabled',
+      message: value ? '你開啟了智慧澆水模式' : '你關閉了智慧澆水模式',
+    });
   };
 
   // --- 未讀通知數 ---
@@ -886,12 +981,12 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
               </Text>
             )}
             <Slider
-               style={{ width: '100%', height: 40 }}
+               containerStyle={{ width: '100%', height: 40 }}
                minimumValue={editingType === 'temp' ? 0 : 0}
                maximumValue={editingType === 'temp' ? 35 : 100}
                step={1}
                value={tempValue}
-               onValueChange={setTempValue}
+               onValueChange={(v: number | number[]) => setTempValue(Array.isArray(v) ? v[0] : v)}
                minimumTrackTintColor="#1abc9c"
                maximumTrackTintColor="#ccc"
              />
@@ -906,16 +1001,74 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
                </View>
                <View style={{ flex: 1, marginLeft: 8 }}>
                  <Button title="確認" color="#1abc9c" onPress={() => {
-                   if(editingType === 'soil') setSoilMoistureThreshold(tempValue);
-                   if(editingType === 'temp') setMinTemperatureThreshold(tempValue);
-                   if(editingType === 'humidity') setHumidityThreshold(tempValue);
-                   setModalVisible(false);
-                 }} />
-               </View>
-             </View>
+                  if(editingType === 'soil') {
+                    const oldVal = soilMoistureThreshold;
+                    const newVal = tempValue;
+                    if (oldVal !== newVal) {
+                      logEvent({
+                        source: 'user',
+                        category: 'settings',
+                        action: 'threshold_changed',
+                        message: '更新土壤濕度警告門檻',
+                        meta: { type: 'soil', old: oldVal, new: newVal }
+                      });
+                    }
+                    setSoilMoistureThreshold(newVal);
+                  }
+                  if(editingType === 'temp') {
+                    const oldVal = minTemperatureThreshold;
+                    const newVal = tempValue;
+                    if (oldVal !== newVal) {
+                      logEvent({
+                        source: 'user',
+                        category: 'settings',
+                        action: 'threshold_changed',
+                        message: '更新溫度警告門檻',
+                        meta: { type: 'temp', old: oldVal, new: newVal }
+                      });
+                    }
+                    setMinTemperatureThreshold(newVal);
+                  }
+                  if(editingType === 'humidity') {
+                    const oldVal = humidityThreshold;
+                    const newVal = tempValue;
+                    if (oldVal !== newVal) {
+                      logEvent({
+                        source: 'user',
+                        category: 'settings',
+                        action: 'threshold_changed',
+                        message: '更新環境濕度警告門檻',
+                        meta: { type: 'humidity', old: oldVal, new: newVal }
+                      });
+                    }
+                    setHumidityThreshold(newVal);
+                  }
+                  setModalVisible(false);
+                }} />
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
+
+      {/* 行為日誌面板 */}
+      <View style={{ marginTop: 12, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Text style={{ fontWeight: 'bold' }}>行為日誌</Text>
+          <TouchableOpacity onPress={clearLogs} style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#eee', borderRadius: 6 }}>
+            <Text>清除</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView style={{ maxHeight: 200 }}>
+          {logs.slice(0, 20).map((log) => (
+            <View key={log.id} style={{ paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#e6e6e6' }}>
+              <Text style={{ color: '#666', fontSize: 12 }}>{new Date(log.timestamp).toLocaleTimeString()}</Text>
+              <Text style={{ color: '#333' }}>{log.message}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+
     </View>
   );
 }

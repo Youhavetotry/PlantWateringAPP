@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, Stack } from 'expo-router';
+import { useEventLog } from './context/event-log-context';
 
 const mockDevices = [
   { id: 'deviceA', name: '測試樹莓派 A' },
@@ -10,6 +11,7 @@ const mockDevices = [
 
 export default function DeviceSelectScreen() {
   // 設定 header 標題
+  const { logEvent } = useEventLog();
   return (
     <>
       <Stack.Screen options={{ title: '選擇設備', headerTitleAlign: 'center' }} />
@@ -34,7 +36,12 @@ export default function DeviceSelectScreen() {
                 alignItems: 'center',
               }}
               onPress={async () => {
-                await AsyncStorage.setItem('deviceId', item.id);
+                try {
+                  await AsyncStorage.setItem('deviceId', item.id);
+                  logEvent({ source: 'user', category: 'device', action: 'device_selected', message: '選擇設備', meta: { deviceId: item.id, name: item.name } });
+                } catch (e) {
+                  logEvent({ source: 'system', category: 'error', action: 'async_storage_error', message: '寫入裝置選擇失敗', meta: { where: 'device_select.set(deviceId)', error: String(e), deviceId: item.id } });
+                }
                 router.replace('/');
               }}
             >

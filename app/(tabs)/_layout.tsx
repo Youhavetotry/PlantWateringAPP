@@ -7,19 +7,27 @@ import { useTheme } from "../style/theme-context";
 import { SensorDataProvider } from '../context/sensor-data-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, usePathname } from "expo-router";
+import { useEventLog } from '../context/event-log-context';
 
 export default function TabLayout() {
   const { theme } = useTheme();
   const [isChecking, setIsChecking] = useState(true);
   const pathname = usePathname();
+  const { logEvent } = useEventLog();
 
   useEffect(() => {
     const checkPlant = async () => {
-      const plantJson = await AsyncStorage.getItem('selectedPlant');
-      // 避免在 category-selection 頁面自己 redirect 自己
-      if (!plantJson && pathname !== '/category-selection') {
-        router.replace('/category-selection');
-      } else {
+      try {
+        const plantJson = await AsyncStorage.getItem('selectedPlant');
+        // 避免在 category-selection 頁面自己 redirect 自己
+        if (!plantJson && pathname !== '/category-selection') {
+          logEvent({ source: 'system', category: 'navigation', action: 'redirect_category_selection', message: '未找到已選植物，導向植物分類頁', meta: { from: pathname } });
+          router.replace('/category-selection');
+        }
+      } catch (e) {
+        console.warn('Failed to read selectedPlant:', e);
+        logEvent({ source: 'system', category: 'error', action: 'async_storage_error', message: '讀取 selectedPlant 失敗', meta: { where: 'tabs/_layout.checkPlant', error: String(e) } });
+      } finally {
         setIsChecking(false);
       }
     };

@@ -6,6 +6,7 @@ import { getDynamicStyles } from "../style/dynamic-style";
 import SettingCaptureInterval from '../setting-capture-interval';
 import { Stack, useRouter, Link } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEventLog } from '../context/event-log-context';
 
 // 定義自定義樣式類型
 type CustomStyles = {
@@ -45,6 +46,7 @@ export default function SettingsPage() {
   const dynamicStyles = useMemo(() => getDynamicStyles(theme), [theme]);
   const router = useRouter();
   const bgColor = theme === 'dark' ? '#25292e' : '#fff';
+  const { logEvent } = useEventLog();
   
   // 合併動態樣式和本地樣式
   const styles: CustomStyles = useMemo(() => ({
@@ -66,6 +68,7 @@ export default function SettingsPage() {
   // 處理導航到分類選擇頁面
   const navigateToPlantSelection = () => {
     // 先導航到分類選擇頁面
+    logEvent({ source: 'user', category: 'navigation', action: 'navigate_category_selection', message: '前往植物分類頁' });
     router.push('/category-selection');
   };
 
@@ -84,9 +87,11 @@ export default function SettingsPage() {
             try {
               await AsyncStorage.removeItem('selectedPlant');
               Alert.alert('成功', '已重設植物選擇，請重新選擇植物類型');
+              logEvent({ source: 'user', category: 'settings', action: 'plant_selection_reset', message: '你重設了植物選擇' });
             } catch (error) {
               console.error('重設植物選擇失敗:', error);
               Alert.alert('錯誤', '重設植物選擇失敗，請稍後再試');
+              logEvent({ source: 'system', category: 'error', action: 'async_storage_error', message: '重設植物選擇失敗', meta: { where: 'settings.resetPlantSelection.remove(selectedPlant)', error: String(error) } });
             }
           },
         },

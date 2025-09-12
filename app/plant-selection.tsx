@@ -17,6 +17,7 @@ import { plantTypes, PlantType, plantCategories } from './constants/plantTypes';
 import { Stack } from 'expo-router';
 import { useTheme } from './style/theme-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useEventLog } from './context/event-log-context';
 
 // 定義樣式類型
 type Styles = {
@@ -110,6 +111,7 @@ const PlantSelection = () => {
   const router = useRouter();
   const { theme } = useTheme();
   const { category } = useLocalSearchParams<{ category?: string }>();
+  const { logEvent } = useEventLog();
   
   // 過濾植物列表
   const filteredPlants = plantTypes.filter(plant => {
@@ -147,6 +149,13 @@ const PlantSelection = () => {
         }
       } catch (error) {
         console.error('載入植物設定失敗:', error);
+        logEvent({
+          source: 'system',
+          category: 'error',
+          action: 'async_storage_error',
+          message: '載入已選植物失敗',
+          meta: { where: 'plant-selection.loadSelectedPlant', error: String(error) }
+        });
       }
     };
 
@@ -164,6 +173,19 @@ const PlantSelection = () => {
         ['minTemperatureThreshold', plant.defaultSettings.minTemperatureThreshold.toString()],
         ['humidityThreshold', plant.defaultSettings.humidityThreshold.toString()],
       ]);
+      // 記錄選擇植物事件
+      logEvent({
+        source: 'user',
+        category: 'plant',
+        action: 'plant_selected',
+        message: `已選擇植物：${plant.name}`,
+        meta: {
+          id: plant.id,
+          name: plant.name,
+          category: plant.category,
+          defaults: plant.defaultSettings
+        }
+      });
       
       // 返回上一頁並傳遞新的閾值參數
       router.push({
@@ -176,6 +198,13 @@ const PlantSelection = () => {
       });
     } catch (error) {
       console.error('儲存植物選擇失敗', error);
+      logEvent({
+        source: 'system',
+        category: 'error',
+        action: 'async_storage_error',
+        message: '儲存植物選擇或更新閾值失敗',
+        meta: { where: 'plant-selection.handleSelectPlant', plantId: plant.id, error: String(error) }
+      });
     }
   };
 

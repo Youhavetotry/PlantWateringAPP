@@ -1,10 +1,36 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ThemeProvider, useTheme } from "./style/theme-context";
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+import { EventLogProvider } from './context/event-log-context';
 
 function RootLayoutContent() {
   const { theme } = useTheme();
+
+  useEffect(() => {
+    const initNotifications = async () => {
+      try {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'default',
+            importance: Notifications.AndroidImportance.DEFAULT,
+          });
+        }
+      } catch (e) {
+        // Avoid blocking app on permission errors
+        console.warn('Notifications init failed:', e);
+      }
+    };
+    initNotifications();
+  }, []);
 
   return (
     <>
@@ -33,8 +59,10 @@ function RootLayoutContent() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
+    <EventLogProvider>
+      <ThemeProvider>
         <RootLayoutContent />
-    </ThemeProvider>
+      </ThemeProvider>
+    </EventLogProvider>
   );
 }

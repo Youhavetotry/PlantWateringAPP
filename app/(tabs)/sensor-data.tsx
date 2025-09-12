@@ -6,6 +6,7 @@ import { useTheme } from '../style/theme-context'; // 引入 useTheme
 import { getDynamicStyles } from '../style/dynamic-style';
 import { database } from '../configs/firebase-config'; // 引入 Firebase 配置
 import { ref, onChildAdded, off } from 'firebase/database'; // Firebase 引入相關方法
+import { useEventLog } from '../context/event-log-context';
 
 const { width } = Dimensions.get('window');
 const marginLeft = 25; // 左邊邊距
@@ -139,6 +140,7 @@ const SensorCard = ({ label, value, unit, history, type, theme, thresholds }: Se
 export default function SensorData() {
   const { theme } = useTheme();
   const styles = useMemo(() => getDynamicStyles(theme), [theme]);
+  const { logEvent } = useEventLog();
 
   // 門檻設定：預設值與從 AsyncStorage 讀取
   const [soilMoistureThreshold, setSoilMoistureThreshold] = useState(15);
@@ -154,7 +156,15 @@ export default function SensorData() {
         if (soil !== null) setSoilMoistureThreshold(Number(soil));
         if (temp !== null) setTemperatureThreshold(Number(temp));
         if (hum !== null) setHumidityThreshold(Number(hum));
-      } catch (e) {}
+      } catch (e) {
+        logEvent({
+          source: 'system',
+          category: 'error',
+          action: 'async_storage_error',
+          message: '讀取感測器門檻設定失敗',
+          meta: { where: 'sensor-data.initThresholds', error: String(e) }
+        });
+      }
     })();
   }, []);
 
@@ -165,6 +175,10 @@ export default function SensorData() {
         await AsyncStorage.setItem('soilMoistureThreshold', soilMoistureThreshold.toString());
       } catch (e) {
         console.error('Failed to save soil moisture threshold', e);
+        logEvent({
+          source: 'system', category: 'error', action: 'async_storage_error',
+          message: '寫入土壤濕度門檻失敗', meta: { where: 'sensor-data.saveSoil', error: String(e), value: soilMoistureThreshold }
+        });
       }
     })();
   }, [soilMoistureThreshold]);
@@ -176,6 +190,10 @@ export default function SensorData() {
         await AsyncStorage.setItem('temperatureThreshold', temperatureThreshold.toString());
       } catch (e) {
         console.error('Failed to save temperature threshold', e);
+        logEvent({
+          source: 'system', category: 'error', action: 'async_storage_error',
+          message: '寫入溫度門檻失敗', meta: { where: 'sensor-data.saveTemp', error: String(e), value: temperatureThreshold }
+        });
       }
     })();
   }, [temperatureThreshold]);
@@ -187,6 +205,10 @@ export default function SensorData() {
         await AsyncStorage.setItem('humidityThreshold', humidityThreshold.toString());
       } catch (e) {
         console.error('Failed to save humidity threshold', e);
+        logEvent({
+          source: 'system', category: 'error', action: 'async_storage_error',
+          message: '寫入環境濕度門檻失敗', meta: { where: 'sensor-data.saveHumidity', error: String(e), value: humidityThreshold }
+        });
       }
     })();
   }, [humidityThreshold]);
@@ -234,7 +256,7 @@ export default function SensorData() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.dataContainer}>
+      <View style={styles.sensorDataContainer}>
         {/* 數據卡片顯示區塊 */}
         <SensorCard
           label="土壤濕度"

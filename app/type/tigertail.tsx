@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { ScrollView, Text, Image, SafeAreaView } from 'react-native';
+import { ScrollView, Text, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../style/theme-context'; // 引入 useTheme
 import { getDynamicStyles } from "../style/dynamic-style";
 
