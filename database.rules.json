@@ -1,0 +1,35 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "sensorData": {
+      ".read": true,
+      ".write": true,
+      "latest": {
+        ".read": true,
+        ".write": true
+      }
+    },
+
+    "waterPump": {
+      ".read": true,
+      ".write": true
+    },
+
+    "photo": {
+      ".read": true,
+      ".write": true
+    },
+
+    "mode": {
+      ".read": true,
+      ".write": true
+    },
+    
+    "latestImage": {
+      ".read": true,
+      ".write": false
+    }
+  }
+}

@@ -369,6 +369,8 @@ const IndexScreen = () => {
   
   // 當前選擇的植物狀態
   const [currentPlant, setCurrentPlant] = useState<PlantType | null>(null);
+  // 智慧模式說明彈窗
+  const [smartInfoVisible, setSmartInfoVisible] = useState(false);
   
   // 從 AsyncStorage 讀取選擇的植物
   useEffect(() => {
@@ -402,6 +404,25 @@ const IndexScreen = () => {
   // 兩個水泵的狀態 (僅顯示狀態的文字，不作 toggle 而是上傳命令)
   const [loading, setLoading] = useState<{ pump1: boolean; pump2: boolean }>({ pump1: false, pump2: false });
   const [cooldown, setCooldown] = useState<{ pump1: boolean; pump2: boolean }>({ pump1: false, pump2: false });
+  const [cooldownSeconds, setCooldownSeconds] = useState<{ pump1: number | null; pump2: number | null }>({ pump1: null, pump2: null });
+  const cooldownIntervalRef = useRef<{ [key in 'pump1' | 'pump2']: NodeJS.Timeout | number | null }>({ pump1: null, pump2: null });
+  const cooldownTimeoutRef = useRef<{ [key in 'pump1' | 'pump2']: NodeJS.Timeout | number | null }>({ pump1: null, pump2: null });
+
+  // 冷卻計時器清理（避免記憶體洩漏）
+  useEffect(() => {
+    return () => {
+      (['pump1', 'pump2'] as const).forEach(p => {
+        if (cooldownIntervalRef.current[p]) {
+          clearInterval(cooldownIntervalRef.current[p]!);
+          cooldownIntervalRef.current[p] = null;
+        }
+        if (cooldownTimeoutRef.current[p]) {
+          clearTimeout(cooldownTimeoutRef.current[p]!);
+          cooldownTimeoutRef.current[p] = null;
+        }
+      });
+    };
+  }, []);
 
   // 擴充資訊：澆水次數統計
   const [wateringStats, setWateringStats] = useState({ todayCount: 0, weekCount: 0, lastWateringTimestamp: null as string | null });
@@ -486,7 +507,32 @@ const stopWaterPump = (pump: 'pump1' | 'pump2', reason: 'manual' | 'auto' | 'tim
   if (reason === 'manual') {
     title = `水泵 ${pump === 'pump1' ? '1' : '2'} 已手動停止`;
     body = `運行時間：${elapsedTime} 秒\n原因：你手動停止`;
-    // manual 停止的使用者事件已在觸發端記錄
+    setCooldown(prev => ({ ...prev, [pump]: true }));
+    setCooldownSeconds(prev => ({ ...prev, [pump]: 3 }));
+    if (cooldownIntervalRef.current[pump]) {
+      clearInterval(cooldownIntervalRef.current[pump]!);
+      cooldownIntervalRef.current[pump] = null;
+    }
+    if (cooldownTimeoutRef.current[pump]) {
+      clearTimeout(cooldownTimeoutRef.current[pump]!);
+      cooldownTimeoutRef.current[pump] = null;
+    }
+    const interval = setInterval(() => {
+      setCooldownSeconds(prev => {
+        const cur = (prev[pump] ?? 0) - 1;
+        return { ...prev, [pump]: cur > 0 ? cur : 0 };
+      });
+    }, 1000);
+    cooldownIntervalRef.current[pump] = interval;
+    const timeout = setTimeout(() => {
+      if (cooldownIntervalRef.current[pump]) {
+        clearInterval(cooldownIntervalRef.current[pump]!);
+        cooldownIntervalRef.current[pump] = null;
+      }
+      setCooldown(prev => ({ ...prev, [pump]: false }));
+      setCooldownSeconds(prev => ({ ...prev, [pump]: null }));
+    }, 3000);
+    cooldownTimeoutRef.current[pump] = timeout;
   } else if (reason === 'timeout') {
     title = `水泵 ${pump === 'pump1' ? '1' : '2'} 已自動停止`;
     body = `運行時間：${elapsedTime} 秒\n原因：超過最大澆水時間`;
@@ -633,6 +679,15 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
       action: value ? 'smart_mode_enabled' : 'smart_mode_disabled',
       message: value ? '你開啟了智慧澆水模式' : '你關閉了智慧澆水模式',
     });
+    // 若關閉智慧模式，為防呆立即關閉正在運行的水泵（不觸發手動冷卻）
+    if (!value) {
+      if (isWatering.pump1 || waterPump1Status === 'ON') {
+        stopWaterPump('pump1', 'auto');
+      }
+      if (isWatering.pump2 || waterPump2Status === 'ON') {
+        stopWaterPump('pump2', 'auto');
+      }
+    }
   };
 
   // --- 未讀通知數 ---
@@ -721,7 +776,11 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
           {loading.pump1 ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>水泵 1 ({waterPump1Status})</Text>
+            <Text style={styles.buttonText}>
+              {cooldown.pump1 && typeof cooldownSeconds.pump1 === 'number'
+                ? `冷卻 ${cooldownSeconds.pump1}s`
+                : `水泵 1 (${waterPump1Status})`}
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -736,7 +795,11 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
           {loading.pump2 ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>水泵 2 ({waterPump2Status})</Text>
+            <Text style={styles.buttonText}>
+              {cooldown.pump2 && typeof cooldownSeconds.pump2 === 'number'
+                ? `冷卻 ${cooldownSeconds.pump2}s`
+                : `水泵 2 (${waterPump2Status})`}
+            </Text>
           )}
         </TouchableOpacity>
       </View>
@@ -765,8 +828,59 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
           trackColor={{ false: theme === 'dark' ? '#444' : '#767577', true: '#1abc9c' }}
           thumbColor={smartMode ? (theme === 'dark' ? '#fff' : '#fff') : (theme === 'dark' ? '#333' : '#f4f3f4')}
           ios_backgroundColor={theme === 'dark' ? '#444' : '#ccc'}
+          disabled={dropdownVisible}
         />
+        <TouchableOpacity
+          onPress={() => setSmartInfoVisible(true)}
+          style={{ marginLeft: 8, padding: 6 }}
+          accessibilityLabel="智慧模式說明"
+        >
+          <Ionicons name="help-circle-outline" size={22} color={theme === 'dark' ? '#e0e0e0' : '#25292e'} />
+        </TouchableOpacity>
       </View>
+
+      {/* 智慧模式說明 Modal */}
+      <Modal
+        visible={smartInfoVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSmartInfoVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{
+            width: '82%',
+            backgroundColor: theme === 'dark' ? '#2c313a' : '#ffffff',
+            borderRadius: 12,
+            padding: 16,
+            shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, elevation: 4
+          }}>
+            <Text style={{
+              fontSize: 16,
+              fontWeight: 'bold',
+              marginBottom: 8,
+              color: theme === 'dark' ? '#e0e0e0' : '#25292e'
+            }}>什麼是智慧澆水模式？</Text>
+            <Text style={{
+              fontSize: 14,
+              lineHeight: 20,
+              color: theme === 'dark' ? '#cfd3da' : '#444'
+            }}>
+              開啟後，系統會依據土壤濕度自動啟停水泵：
+              {'\n'}• 當濕度低於你的門檻時自動開啟。
+              {'\n'}• 達到目標濕度或超過安全時間會自動關閉。
+              {'\n'}• 手動控制將暫停，避免與自動邏輯衝突。
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 14 }}>
+              <TouchableOpacity
+                onPress={() => setSmartInfoVisible(false)}
+                style={{ paddingHorizontal: 14, paddingVertical: 8, backgroundColor: theme === 'dark' ? '#3a7bd5' : '#1abc9c', borderRadius: 8 }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>了解</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 通知鈴鐺按鈕（右上角） */}
       <View style={notificationStyles.bellContainer}>
@@ -1052,18 +1166,32 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
       </Modal>
 
       {/* 行為日誌面板 */}
-      <View style={{ marginTop: 12, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
+      <View style={{ 
+        marginTop: 12, 
+        padding: 12, 
+        backgroundColor: theme === 'dark' ? '#23272F' : '#f5f5f5', 
+        borderRadius: 8 
+      }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ fontWeight: 'bold' }}>行為日誌</Text>
-          <TouchableOpacity onPress={clearLogs} style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#eee', borderRadius: 6 }}>
-            <Text>清除</Text>
+          <Text style={{ fontWeight: 'bold', color: theme === 'dark' ? '#e0e0e0' : '#25292e' }}>行為日誌</Text>
+          <TouchableOpacity onPress={clearLogs} style={{ 
+            paddingHorizontal: 10, 
+            paddingVertical: 4, 
+            backgroundColor: theme === 'dark' ? '#33373e' : '#eee', 
+            borderRadius: 6 
+          }}>
+            <Text style={{ color: theme === 'dark' ? '#e0e0e0' : '#25292e' }}>清除</Text>
           </TouchableOpacity>
         </View>
         <ScrollView style={{ maxHeight: 200 }}>
           {logs.slice(0, 20).map((log) => (
-            <View key={log.id} style={{ paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#e6e6e6' }}>
-              <Text style={{ color: '#666', fontSize: 12 }}>{new Date(log.timestamp).toLocaleTimeString()}</Text>
-              <Text style={{ color: '#333' }}>{log.message}</Text>
+            <View key={log.id} style={{ 
+              paddingVertical: 6, 
+              borderBottomWidth: 1, 
+              borderBottomColor: theme === 'dark' ? '#3a3f47' : '#e6e6e6' 
+            }}>
+              <Text style={{ color: theme === 'dark' ? '#a0a0a0' : '#666', fontSize: 12 }}>{new Date(log.timestamp).toLocaleTimeString()}</Text>
+              <Text style={{ color: theme === 'dark' ? '#e0e0e0' : '#333' }}>{log.message}</Text>
             </View>
           ))}
         </ScrollView>
