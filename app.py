@@ -6,6 +6,8 @@ import spidev
 import firebase_admin
 from firebase_admin import credentials, db
 import threading
+import requests
+import urllib3
 import RPi.GPIO as GPIO
 
 # ---------- 初始化 Firebase ----------
@@ -109,11 +111,18 @@ def upload_sensor_data():
         temperature_c = sensor_dht.temperature
         humidity = sensor_dht.humidity
         adc_value = read_adc(0)
-        soil_moisture = convert_to_moisture(adc_value)
 
-        temperature_c = round(temperature_c, 1)
-        humidity = round(humidity, 1)
-        soil_moisture = round(soil_moisture, 1)
+        if temperature_c is None or humidity is None or adc_value is None or adc_value < 0:
+            print("[略過] 感測值為 None/非法，等待下次讀取")
+            return
+
+        try:
+            temperature_c = round(float(temperature_c), 1)
+            humidity = round(float(humidity), 1)
+            soil_moisture = round(float(convert_to_moisture(adc_value)), 1)
+        except Exception as e:
+            print(f"[略過] 數值轉換異常: {e}")
+            return
 
         temp_change = last_uploaded_data['temperature_c'] is None or abs(temperature_c - last_uploaded_data['temperature_c']) >= TEMP_THRESHOLD
         humidity_change = last_uploaded_data['humidity'] is None or abs(humidity - last_uploaded_data['humidity']) >= HUMIDITY_THRESHOLD
@@ -127,16 +136,19 @@ def upload_sensor_data():
                 'soil_moisture': soil_moisture,
                 'timestamp': datetime.datetime.now().isoformat()
             }
-            sensor_ref.push(sensor_data)
-            print(f"[上傳] 感測數據: {sensor_data}")
-            last_uploaded_data = sensor_data
+            try:
+                sensor_ref.push(sensor_data)
+                print(f"[上傳] 感測數據: {sensor_data}")
+                last_uploaded_data = sensor_data
+            except (requests.exceptions.RequestException, urllib3.exceptions.HTTPError, ConnectionError) as e:
+                print(f"[網路錯誤] 上傳失敗: {e}")
         else:
             print("[略過] 數據無顯著變化")
 
     except RuntimeError as error:
         print(f"[讀取錯誤] {error.args[0]}")
     except Exception as error:
-        print(f"[致命錯誤] 重建 DHT sensor: {error}")
+        print(f"[非網路] 未分類錯誤: {error}")
         try:
             sensor_dht.exit()
         except:

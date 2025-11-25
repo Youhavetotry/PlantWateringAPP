@@ -779,7 +779,9 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
             <Text style={styles.buttonText}>
               {cooldown.pump1 && typeof cooldownSeconds.pump1 === 'number'
                 ? `冷卻 ${cooldownSeconds.pump1}s`
-                : `水泵 1 (${waterPump1Status})`}
+                : (isButtonDisabled && soilMoisture > 70
+                    ? '禁用(土壤濕度高)'
+                    : `水泵 1 (${waterPump1Status})`)}
             </Text>
           )}
         </TouchableOpacity>
@@ -798,7 +800,9 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
             <Text style={styles.buttonText}>
               {cooldown.pump2 && typeof cooldownSeconds.pump2 === 'number'
                 ? `冷卻 ${cooldownSeconds.pump2}s`
-                : `水泵 2 (${waterPump2Status})`}
+                : (isButtonDisabled && soilMoisture > 70
+                    ? '禁用(土壤濕度高)'
+                    : `水泵 2 (${waterPump2Status})`)}
             </Text>
           )}
         </TouchableOpacity>
