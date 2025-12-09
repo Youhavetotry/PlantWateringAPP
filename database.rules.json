@@ -27,6 +27,21 @@
       ".write": true
     },
     
+    "thresholds": {
+      ".read": true,
+      ".write": true
+    },
+
+    "status": {
+      ".read": true,
+      ".write": true
+    },
+    
+    "settings": {
+      ".read": true,
+      ".write": true
+    },
+    
     "latestImage": {
       ".read": true,
       ".write": false

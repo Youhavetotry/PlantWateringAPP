@@ -253,15 +253,8 @@ const IndexScreen = () => {
   // --- 智慧模式自動開啟水泵 ---
   useEffect(() => {
     if (smartMode && soilMoisture < soilMoistureThreshold && waterPump1Status !== 'ON' && !isWatering.pump1) {
-      // 記錄智慧模式自動開啟
-      logEvent({
-        source: 'system',
-        category: 'smart_watering',
-        action: 'smart_auto_on',
-        message: '智慧澆水自動開啟水泵 1',
-        meta: { soilMoisture, soilMoistureThreshold }
-      });
-      updatePumpStatus('pump1', 'ON');
+      // 透過 toggleWaterPump，以便記錄開始時間與統一日誌
+      toggleWaterPump('pump1', 'smart');
     }
   }, [smartMode, soilMoisture, soilMoistureThreshold, waterPump1Status, isWatering.pump1]);
 
@@ -396,6 +389,17 @@ const IndexScreen = () => {
     loadSelectedPlant();
   }, []);
   
+  // 將所選植物同步到 RTDB，便於 Pi 或其他用戶端讀取
+  useEffect(() => {
+    if (currentPlant) {
+      try {
+        set(ref(database, 'settings/selectedPlant'), currentPlant);
+      } catch (e) {
+        // ignore transient errors
+      }
+    }
+  }, [currentPlant]);
+  
   // 計算進度條的比例值
   const validSoilMoisture = Math.round((soilMoisture / 100) * 100) / 100;
   const validTemperature = Math.min(1, Math.max(0, temperature / 40));
@@ -488,7 +492,12 @@ const updatePumpStatus = async (pump: 'pump1' | 'pump2', status: 'ON' | 'OFF') =
 };
 
 // --- 停止水泵 ---
-const stopWaterPump = (pump: 'pump1' | 'pump2', reason: 'manual' | 'auto' | 'timeout' = 'manual') => {
+// reason:
+//  - 'manual'   : 使用者按按鈕停止
+//  - 'auto'     : 土壤濕度達標（智慧或自動邏輯）
+//  - 'timeout'  : 超過最大澆水時間
+//  - 'smart_off': 你關閉智慧模式時為防呆自動關閉
+const stopWaterPump = (pump: 'pump1' | 'pump2', reason: 'manual' | 'auto' | 'timeout' | 'smart_off' = 'manual') => {
   updatePumpStatus(pump, "OFF");
   setIsWatering(prev => ({ ...prev, [pump]: false }));
   if (wateringUnsubscribeRef.current[pump]) {
@@ -499,7 +508,9 @@ const stopWaterPump = (pump: 'pump1' | 'pump2', reason: 'manual' | 'auto' | 'tim
     clearTimeout(wateringTimeoutRef.current[pump]!);
     wateringTimeoutRef.current[pump] = null;
   }
-  const elapsedTime = Math.round((Date.now() - pumpStartTimeRef.current[pump]) / 1000);
+  const startedAt = pumpStartTimeRef.current[pump];
+  const elapsedMs = startedAt ? Date.now() - startedAt : 0;
+  const elapsedTime = Math.max(0, Math.round(elapsedMs / 1000));
   const now = new Date().toISOString();
   let title = '';
   let body = '';
@@ -544,6 +555,16 @@ const stopWaterPump = (pump: 'pump1' | 'pump2', reason: 'manual' | 'auto' | 'tim
       message: `超過安全時限，自動關閉水泵 ${pump === 'pump1' ? '1' : '2'}`,
       meta: { durationSec: elapsedTime }
     });
+  } else if (reason === 'smart_off') {
+    title = `水泵 ${pump === 'pump1' ? '1' : '2'} 已自動停止`;
+    body = `運行時間：${elapsedTime} 秒\n原因：你關閉智慧模式，系統為安全自動關閉`;
+    logEvent({
+      source: 'system',
+      category: 'smart_watering',
+      action: 'smart_mode_force_pump_off',
+      message: `你關閉智慧模式時，系統自動關閉水泵 ${pump === 'pump1' ? '1' : '2'}`,
+      meta: { durationSec: elapsedTime }
+    });
   } else {
     title = `水泵 ${pump === 'pump1' ? '1' : '2'} 已自動停止`;
     body = `運行時間：${elapsedTime} 秒\n原因：土壤濕度已達標`;
@@ -575,7 +596,7 @@ const stopWaterPump = (pump: 'pump1' | 'pump2', reason: 'manual' | 'auto' | 'tim
 };
 
 // --- 啟動/切換水泵 ---
-const toggleWaterPump = async (pump: 'pump1' | 'pump2') => {
+const toggleWaterPump = async (pump: 'pump1' | 'pump2', source: 'user' | 'smart' = 'user') => {
   updateWateringStats();
   if (cooldown[pump]) return;
   if (isWatering[pump]) {
@@ -594,12 +615,22 @@ const toggleWaterPump = async (pump: 'pump1' | 'pump2') => {
   try {
     await updatePumpStatus(pump, "ON");
     setIsWatering(prev => ({ ...prev, [pump]: true }));
-    logEvent({
-      source: 'user',
-      category: 'pump',
-      action: 'pump_on',
-      message: `你手動打開了水泵 ${pump === 'pump1' ? '1' : '2'}`,
-    });
+    if (source === 'user') {
+      logEvent({
+        source: 'user',
+        category: 'pump',
+        action: 'pump_on',
+        message: `你手動打開了水泵 ${pump === 'pump1' ? '1' : '2'}`,
+      });
+    } else {
+      logEvent({
+        source: 'system',
+        category: 'smart_watering',
+        action: 'smart_auto_on',
+        message: `智慧澆水自動開啟水泵 ${pump === 'pump1' ? '1' : '2'}`,
+        meta: { soilMoisture, soilMoistureThreshold }
+      });
+    }
     const unsubscribe = onValue(soilMoistureRef, (snapshot) => {
       const currentMoisture = snapshot.val()?.moisture;
       const elapsedTime = Date.now() - pumpStartTimeRef.current[pump];
@@ -651,9 +682,62 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
 
   // --- 智慧澆水模式 state ---
   
+  // --- 將門檻/安全時限同步到 RTDB（供樹莓派智慧模式使用） ---
+  useEffect(() => {
+    try {
+      set(ref(database, 'thresholds/soilMoisture'), soilMoistureThreshold);
+    } catch (e) {
+      // no-op in case of offline; will retry on next change
+    }
+  }, [soilMoistureThreshold]);
+
+  useEffect(() => {
+    try {
+      set(ref(database, 'thresholds/maxWateringTimeMs'), maxWateringTimeMs);
+    } catch (e) {
+      // no-op
+    }
+  }, [maxWateringTimeMs]);
+
+  // 非必須：若需要也可同步下列兩個環境門檻（目前 Pi 端未使用）
+  useEffect(() => {
+    try { set(ref(database, 'thresholds/minTemperature'), minTemperatureThreshold); } catch {}
+  }, [minTemperatureThreshold]);
+  useEffect(() => {
+    try { set(ref(database, 'thresholds/humidity'), humidityThreshold); } catch {}
+  }, [humidityThreshold]);
+
   // --- 禁用按鈕條件 ---
   const isButtonDisabled = soilMoisture > 70 || smartMode;
 
+  // 新增一個函數來更新 Firebase 中的閾值
+  const updateThresholdInFirebase = async (type: 'soil' | 'temp' | 'humidity' | 'waterTime', value: number) => {
+    try {
+      const updates: Record<string, any> = {};
+      
+      // 根據類型設置對應的 Firebase 路徑
+      switch (type) {
+        case 'soil':
+          updates['/thresholds/soilMoisture'] = value;
+          break;
+        case 'temp':
+          updates['/thresholds/minTemperature'] = value;
+          break;
+        case 'humidity':
+          updates['/thresholds/humidity'] = value;
+          break;
+        case 'waterTime':
+          updates['/thresholds/maxWateringTimeMs'] = value * 1000; // 轉換為毫秒
+          break;
+      }
+
+      await update(ref(database), updates);
+      console.log(`成功更新 ${type} 閾值為:`, value);
+    } catch (error) {
+      console.error(`更新 ${type} 閾值到 Firebase 失敗:`, error);
+      throw error; // 重新拋出錯誤，讓上層處理
+    }
+  };
   // --- 監聽/同步 Smart Mode 狀態 ---
   useEffect(() => {
     // 讀取本地與 Firebase 狀態
@@ -682,14 +766,15 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
     // 若關閉智慧模式，為防呆立即關閉正在運行的水泵（不觸發手動冷卻）
     if (!value) {
       if (isWatering.pump1 || waterPump1Status === 'ON') {
-        stopWaterPump('pump1', 'auto');
+        stopWaterPump('pump1', 'smart_off');
       }
       if (isWatering.pump2 || waterPump2Status === 'ON') {
-        stopWaterPump('pump2', 'auto');
+        stopWaterPump('pump2', 'smart_off');
       }
     }
   };
 
+  
   // --- 未讀通知數 ---
   const unreadCount = notifications.filter((n: Notification) => !n.read).length;
 
@@ -1118,7 +1203,7 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
                  <Button title="取消" color="#888" onPress={() => setModalVisible(false)} />
                </View>
                <View style={{ flex: 1, marginLeft: 8 }}>
-                 <Button title="確認" color="#1abc9c" onPress={() => {
+                 <Button title="確認" color="#1abc9c" onPress={async () => {
                   if(editingType === 'soil') {
                     const oldVal = soilMoistureThreshold;
                     const newVal = tempValue;
@@ -1132,6 +1217,7 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
                       });
                     }
                     setSoilMoistureThreshold(newVal);
+                    await updateThresholdInFirebase('soil', newVal);
                   }
                   if(editingType === 'temp') {
                     const oldVal = minTemperatureThreshold;
@@ -1146,6 +1232,7 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
                       });
                     }
                     setMinTemperatureThreshold(newVal);
+                    await updateThresholdInFirebase('temp', newVal);
                   }
                   if(editingType === 'humidity') {
                     const oldVal = humidityThreshold;
@@ -1160,6 +1247,7 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
                       });
                     }
                     setHumidityThreshold(newVal);
+                    await updateThresholdInFirebase('humidity', newVal);
                   }
                   setModalVisible(false);
                 }} />

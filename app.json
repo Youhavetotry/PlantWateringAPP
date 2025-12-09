@@ -10,14 +10,19 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.YHTT.PlantWatering"
+      "bundleIdentifier": "com.YHTT.PlantWatering",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "此應用需要使用麥克風以進行語音指令。",
+        "NSSpeechRecognitionUsageDescription": "此應用需要使用語音辨識以執行指令。"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.YHTT.PlantWatering"
+      "package": "com.YHTT.PlantWatering",
+      "permissions": ["RECORD_AUDIO"]
     },
     "web": {
       "bundler": "metro",
