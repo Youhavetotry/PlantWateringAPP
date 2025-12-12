@@ -316,3 +316,5 @@ declare module 'react-native' {
     elevation?: number;
   }
 }
+
+export default getDynamicStyles;

@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.YHTT.PlantWatering'
+    namespace 'com.s080910299.PlantWatering'
     defaultConfig {
-        applicationId 'com.YHTT.PlantWatering'
+        applicationId 'com.s080910299.PlantWatering'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

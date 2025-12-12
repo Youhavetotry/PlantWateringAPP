@@ -3,8 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Button, Animated, ActivityIndicator, Switch, Platform } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { PlantType } from '../constants/plantTypes';
+// @ts-ignore
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+// @ts-ignore
 import { Slider } from '@miblanchard/react-native-slider';
 import * as Notifications from 'expo-notifications';
 import { useTheme } from '../style/theme-context';
@@ -1183,16 +1185,16 @@ const handleWaterPumpPress = (pump: 'pump1' | 'pump2') => {
                 可設定低於範圍：0 ~ 100%
               </Text>
             )}
-            <Slider
-               containerStyle={{ width: '100%', height: 40 }}
-               minimumValue={editingType === 'temp' ? 0 : 0}
-               maximumValue={editingType === 'temp' ? 35 : 100}
-               step={1}
-               value={tempValue}
-               onValueChange={(v: number | number[]) => setTempValue(Array.isArray(v) ? v[0] : v)}
-               minimumTrackTintColor="#1abc9c"
-               maximumTrackTintColor="#ccc"
-             />
+              <Slider
+                containerStyle={{ width: '100%', height: 40 }}
+                minimumValue={editingType === 'temp' ? 0 : 0}
+                maximumValue={editingType === 'temp' ? 35 : 100}
+                step={1}
+                value={tempValue}
+                onValueChange={(v: number | number[]) => setTempValue(Array.isArray(v) ? v[0] : v)}
+                minimumTrackTintColor="#1abc9c"
+                maximumTrackTintColor="#ccc"
+              />
             <Text style={{ color: '#333', fontSize: 15, textAlign: 'center', marginTop: 8, marginBottom: 12, fontWeight: 'bold' }}>
                {editingType === 'soil' && `目前門檻: ${tempValue}%`}
                {editingType === 'temp' && `目前門檻: ${tempValue}°C`}

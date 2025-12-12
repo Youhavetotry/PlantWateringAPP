@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type EventSource = 'user' | 'system';
-export type EventCategory = 'pump' | 'smart_watering' | 'camera' | 'settings' | 'notification' | 'sensor' | 'app' | 'error' | 'navigation' | 'device' | 'plant';
+export type EventCategory = 'pump' | 'smart_watering' | 'camera' | 'settings' | 'notification' | 'sensor' | 'app' | 'error' | 'navigation' | 'device' | 'plant' | 'auth';
 
 export type EventLogItem = {
   id: string;
@@ -99,3 +99,5 @@ export const useEventLog = () => {
   if (!ctx) throw new Error('useEventLog must be used within EventLogProvider');
   return ctx;
 };
+
+export default { useEventLog };

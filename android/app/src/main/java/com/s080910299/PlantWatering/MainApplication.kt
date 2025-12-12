@@ -1,4 +1,4 @@
-package com.YHTT.PlantWatering
+package com.s080910299.PlantWatering
 
 import android.app.Application
 import android.content.res.Configuration

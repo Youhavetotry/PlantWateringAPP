@@ -189,3 +189,5 @@ export const plantTypes: PlantType[] = [
   }
   // 可以在這裡繼續添加更多植物...
 ];
+
+export default plantTypes;
